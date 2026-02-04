@@ -1,0 +1,11 @@
+[project]
+name = "query_gen"
+version = "0.1.0"
+description = "Generate graph neighborhood query workloads for benchmarking feature stores."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pyg-lib>=0.5.0",
+    "torch==2.8.0",
+    "torch-geometric>=2.7.0",
+]
