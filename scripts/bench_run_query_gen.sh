@@ -51,7 +51,7 @@ main() {
     check_uv_install
 
     cd "$PYTHON_ROOT_DIR"
-    uv run python __main__.py "$@"
+    uv run main.py "$@"
 }
 
 main "$@"
