@@ -44,8 +44,11 @@ setup_base_venv() {
 }
 
 add_pyg_lib() {
+    # We use `uv pip install` instead of `uv add` since otherwise,
+    # future calls to `uv sync` result in build resolution problems
+    # with torch and pyg-lib.
     echo "Adding pyg-lib wheel from $PYG_LIB_URL..."
-    uv add pyg-lib -f "$PYG_LIB_URL"
+    uv pip install pyg-lib -f "$PYG_LIB_URL"
 }
 
 main() {

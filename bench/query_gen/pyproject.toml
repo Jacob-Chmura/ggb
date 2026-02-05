@@ -5,7 +5,6 @@ description = "Generate graph neighborhood query workloads for benchmarking feat
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "pyg-lib>=0.5.0",
     "torch==2.8.0",
     "torch-geometric>=2.7.0",
 ]
