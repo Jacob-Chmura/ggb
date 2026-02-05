@@ -17,7 +17,7 @@ parser.add_argument(
     help="Dataset name.",
 )
 parser.add_argument(
-    "--dataset-dir", type=str, default="./data", help="Root directory of the dataset."
+    "--dataset-dir", type=str, default="../data", help="Root directory of the dataset."
 )
 
 _OGB_NODE_PROP_BASE_DOWNLOAD_URL = "http://snap.stanford.edu/ogb/data/nodeproppred"

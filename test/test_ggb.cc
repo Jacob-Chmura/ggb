@@ -7,7 +7,7 @@
 
 #include "ggb.h"
 
-constexpr std::string db_path = "ggb.db";
+constexpr std::string db_path = "test.ggb";
 const std::size_t num_nodes = 5;
 const std::size_t feature_dim = 3;
 

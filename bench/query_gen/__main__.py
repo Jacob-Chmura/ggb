@@ -15,7 +15,7 @@ parser.add_argument(
     help="Dataset name.",
 )
 parser.add_argument(
-    "--dataset-dir", type=str, default="./data", help="Root directory of the dataset."
+    "--dataset-dir", type=str, default="../data", help="Root directory of the dataset."
 )
 parser.add_argument(
     "--rounds", type=int, default=1, help="Number of epochs to simulate."

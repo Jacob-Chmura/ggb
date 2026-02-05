@@ -258,3 +258,6 @@ compile_commands.json
 conan_cache_*.tgz
 .clangd
 .cache
+
+# Any of our db files
+*.ggb
