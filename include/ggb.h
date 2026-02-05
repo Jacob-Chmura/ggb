@@ -1,53 +1,64 @@
-#pragma once
+#ifndef GGB_H
+#define GGB_H
 
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <span>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace ggb {
 
-using NodeID_t = unsigned long long;
+using NodeID_t = std::uint64_t;
 
-struct ggb_config {
+struct Config {
   std::string db_path;
 };
 
-struct ggb_context {
-  ggb_config config;
+struct Context {
+  Config config;
 };
 
 class FeatureStore {
  public:
   virtual ~FeatureStore() = default;
 
-  virtual auto num_nodes() const -> size_t = 0;
-  virtual auto feature_dim() const -> size_t = 0;
-  virtual auto get_feature(NodeID_t node) const -> std::span<const float> = 0;
+  [[nodiscard]] virtual auto num_nodes() const -> std::size_t = 0;
+  [[nodiscard]] virtual auto feature_dim() const -> std::size_t = 0;
+  [[nodiscard]] virtual auto get_feature(NodeID_t node) const
+      -> std::span<const float> = 0;
 };
 
 class InMemoryFeatureStore final : public FeatureStore {
  public:
   explicit InMemoryFeatureStore(std::vector<std::vector<float>> data)
-      : _data(std::move(data)),
-        _num_nodes(_data.size()),
-        _feature_dim(_data.empty() ? 0 : _data[0].size()) {}
+      : data_(std::move(data)),
+        num_nodes_(data_.size()),
+        feature_dim_(data_.empty() ? 0 : data_[0].size()) {}
 
-  size_t num_nodes() const override { return _num_nodes; }
-  size_t feature_dim() const override { return _feature_dim; }
+  [[nodiscard]] auto num_nodes() const -> std::size_t override {
+    return num_nodes_;
+  }
+  [[nodiscard]] auto feature_dim() const -> std::size_t override {
+    return feature_dim_;
+  }
 
-  std::span<const float> get_feature(NodeID_t node) const override {
-    return std::span<const float>(_data[node]);
+  [[nodiscard]] auto get_feature(NodeID_t node) const
+      -> std::span<const float> override {
+    return {data_[node]};
   }
 
  private:
-  std::vector<std::vector<float>> _data;
-  size_t _num_nodes = 0;
-  size_t _feature_dim = 0;
+  std::vector<std::vector<float>> data_;
+  std::size_t num_nodes_ = 0;
+  std::size_t feature_dim_ = 0;
 };
 
 namespace detail {
-auto write_file(const std::string &db_path, const FeatureStore &features)
+inline auto write_file(const std::string &db_path, const FeatureStore &features)
     -> void {
   std::cout << "Building graph at db_path: " << db_path << std::endl;
   std::ofstream out_file(db_path, std::ios::binary);
@@ -56,26 +67,28 @@ auto write_file(const std::string &db_path, const FeatureStore &features)
     return;
   }
 
-  const auto N = features.num_nodes();
-  const auto F = features.feature_dim();
-  if (N == 0 || F == 0) {
-    std::cerr << "Got empty node features" << std::endl;
+  const auto num_nodes = features.num_nodes();
+  const auto feature_dim = features.feature_dim();
+  if (num_nodes == 0 || feature_dim == 0) {
+    std::cerr << "Got empty node features\n";
     return;
   }
 
-  out_file.write(reinterpret_cast<const char *>(&N), sizeof(N));
-  out_file.write(reinterpret_cast<const char *>(&F), sizeof(F));
-  for (size_t node = 0; node < N; ++node) {
-    const auto x = features.get_feature(node);
-    if (x.size() != F) {
-      std::cerr << "Row has wrong feature size" << std::endl;
+  out_file.write(reinterpret_cast<const char *>(&num_nodes), sizeof(num_nodes));
+  out_file.write(reinterpret_cast<const char *>(&feature_dim),
+                 sizeof(feature_dim));
+  for (std::size_t node = 0; node < num_nodes; ++node) {
+    const auto feat = features.get_feature(node);
+    if (feat.size() != feature_dim) {
+      std::cerr << "Row has wrong feature size\n";
       return;
     }
-    out_file.write(reinterpret_cast<const char *>(x.data()), F * sizeof(x[0]));
+    out_file.write(reinterpret_cast<const char *>(feat.data()),
+                   feature_dim * sizeof(feat[0]));
   }
 }
 
-auto read_file(const std::string &db_path) -> InMemoryFeatureStore {
+inline auto read_file(const std::string &db_path) -> InMemoryFeatureStore {
   std::cout << "Reading graph at db_path: " << db_path << std::endl;
   std::ifstream in_file(db_path, std::ios::binary);
   if (!in_file) {
@@ -83,52 +96,56 @@ auto read_file(const std::string &db_path) -> InMemoryFeatureStore {
     return InMemoryFeatureStore({});
   }
 
-  size_t N = 0;
-  size_t F = 0;
-  in_file.read(reinterpret_cast<char *>(&N), sizeof(N));
-  in_file.read(reinterpret_cast<char *>(&F), sizeof(F));
+  std::size_t num_nodes = 0;
+  std::size_t feature_dim = 0;
+  in_file.read(reinterpret_cast<char *>(&num_nodes), sizeof(num_nodes));
+  in_file.read(reinterpret_cast<char *>(&feature_dim), sizeof(feature_dim));
 
-  if (N == 0 || F == 0) {
-    std::cerr << "Empty matrix in db" << std::endl;
+  if (num_nodes == 0 || feature_dim == 0) {
+    std::cerr << "Got empty node features\n";
     return InMemoryFeatureStore({});
   }
 
-  std::vector<std::vector<float>> features(N, std::vector<float>(F));
-  for (size_t i = 0; i < N; ++i) {
+  std::vector<std::vector<float>> features(num_nodes,
+                                           std::vector<float>(feature_dim));
+  for (std::size_t i = 0; i < num_nodes; ++i) {
     in_file.read(reinterpret_cast<char *>(features[i].data()),
-                 F * sizeof(float));
+                 feature_dim * sizeof(float));
   }
   return InMemoryFeatureStore(features);
 }
 
 }  // namespace detail
 
-auto init(const ggb_config &config) -> ggb_context {
-  ggb_context ctx = {.config = config};
+inline auto init(const Config &config) -> Context {
+  Context ctx = {.config = config};
   return ctx;
 }
 
-auto build(const ggb_context ctx,
-           std::span<const std::pair<NodeID_t, NodeID_t>> edges,
-           const FeatureStore &features) -> void {
+inline auto build(const Context &ctx,
+                  std::span<const std::pair<NodeID_t, NodeID_t>> edges,
+                  const FeatureStore &features) -> void {
   std::cout << "Number of edges: " << edges.size() << std::endl;
   std::cout << "Number of nodes: " << features.num_nodes() << std::endl;
-  std::cout << "Feature Dimension: " << features.feature_dim() << std::endl;
+  std::cout << "Feature Dim: " << features.feature_dim() << std::endl;
   detail::write_file(ctx.config.db_path, features);
 }
 
-auto gather(const ggb_context ctx, const std::vector<NodeID_t> &nodes)
+inline auto gather(const Context &ctx, const std::vector<NodeID_t> &nodes)
     -> std::vector<std::vector<float>> {
   const auto features = detail::read_file(ctx.config.db_path);
-  const size_t B = nodes.size();
-  const size_t F = features.feature_dim();
+  const std::size_t batch_size = nodes.size();
+  const std::size_t feature_dim = features.feature_dim();
 
-  std::vector<std::vector<float>> batch_features(B, std::vector<float>(F));
-  for (size_t i = 0; i < nodes.size(); ++i) {
-    const auto x = features.get_feature(nodes[i]);
-    batch_features[i].assign(x.begin(), x.end());
+  std::vector<std::vector<float>> batch_features(
+      batch_size, std::vector<float>(feature_dim));
+  for (std::size_t i = 0; i < nodes.size(); ++i) {
+    const auto feat = features.get_feature(nodes[i]);
+    batch_features[i].assign(feat.begin(), feat.end());
   }
   return batch_features;
 }
 
 }  // namespace ggb
+
+#endif  // GGB_H
