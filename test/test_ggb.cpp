@@ -46,16 +46,15 @@ void ingest_data(ggb::FeatureStoreBuilder& builder) {
 }  // namespace
 
 auto main() -> int {
-  ggb::engine::GGBConfig cfg{.db_path = db_path};
-  auto engine = ggb::engine::create_ggb_engine(cfg);
-  auto builder = engine->create_builder();
-  ingest_data(*builder);
-
-  std::cout << "\nFinalizing Store (Building flat file)...\n";
-  auto store = builder->build();
+  auto store = ggb::engine::create_ggb_store({.db_path = db_path});
+  {
+    auto builder = store->create_builder();
+    ingest_data(*builder);
+    std::cout << "\nFinalizing Store (Building flat file)...\n";
+    builder->commit();
+  }
 
   std::cout << "\n------------ GATHER RESULTS -----------\n";
-
   std::vector<ggb::FeatureStoreKey> query_keys = {
       {0}, {1}, {3}, {99}  // 99 tests the 'nullopt' case
   };

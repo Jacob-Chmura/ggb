@@ -5,6 +5,6 @@
 
 namespace ggb::engine {
 
-[[nodiscard]] auto create_in_memory_engine() -> std::unique_ptr<FeatureEngine>;
+[[nodiscard]] auto create_in_memory_store() -> std::unique_ptr<FeatureStore>;
 
 }  // namespace ggb::engine
