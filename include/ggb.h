@@ -1,18 +1,72 @@
-#ifndef GGB_H
-#define GGB_H
+#pragma once
 
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
+#include <future>
 #include <iostream>
+#include <memory>
+#include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace ggb {
 
-using NodeID_t = std::uint64_t;
+using NodeID = std::uint64_t;
+using FeatureStoreValue = std::vector<float>;
+
+struct FeatureStoreKey {
+  // For now, we only support homogenous node keys
+  std::uint64_t NodeID;
+
+  auto operator<=>(const FeatureStoreKey &) const = default;
+};
+
+struct GraphTopology {
+  std::span<const std::pair<NodeID, NodeID>> edges;
+};
+
+class FeatureStore {
+ public:
+  virtual ~FeatureStore() = default;
+
+  [[nodiscard]] virtual auto get_num_keys() const -> std::size_t = 0;
+  [[nodiscard]] virtual auto get_tensor_size() const
+      -> std::optional<std::size_t> = 0;
+
+  [[nodiscard]] virtual auto get_multi_tensor_async(
+      std::span<const FeatureStoreKey> keys) const
+      -> std::future<std::vector<FeatureStoreValue>> = 0;
+
+  [[nodiscard]] auto get_multi_tensor(std::span<const FeatureStoreKey> keys)
+      const -> std::vector<FeatureStoreValue> {
+    return get_multi_tensor_async(keys).get();
+  }
+};
+
+class FeatureStoreBuilder {
+ public:
+  virtual ~FeatureStoreBuilder() = default;
+
+  virtual auto put_tensor(const FeatureStoreKey &key,
+                          const FeatureStoreValue &tensor) -> bool = 0;
+
+  [[nodiscard]] virtual auto build(
+      std::optional<GraphTopology> graph = std::nullopt)
+      -> std::unique_ptr<FeatureStore> = 0;
+};
+
+class FeatureEngine {
+ public:
+  virtual ~FeatureEngine() = default;
+  [[nodiscard]] virtual auto create_builder()
+      -> std::unique_ptr<FeatureStoreBuilder> = 0;
+
+  [[nodiscard]] virtual auto name() const -> std::string_view = 0;
+};
 
 struct Config {
   std::string db_path;
@@ -22,17 +76,17 @@ struct Context {
   Config config;
 };
 
-class FeatureStore {
+class OldFeatureStore {
  public:
-  virtual ~FeatureStore() = default;
+  virtual ~OldFeatureStore() = default;
 
   [[nodiscard]] virtual auto num_nodes() const -> std::size_t = 0;
   [[nodiscard]] virtual auto feature_dim() const -> std::size_t = 0;
-  [[nodiscard]] virtual auto get_feature(NodeID_t node) const
+  [[nodiscard]] virtual auto get_feature(NodeID node) const
       -> std::span<const float> = 0;
 };
 
-class InMemoryFeatureStore final : public FeatureStore {
+class InMemoryFeatureStore final : public OldFeatureStore {
  public:
   explicit InMemoryFeatureStore(std::vector<std::vector<float>> data)
       : data_(std::move(data)),
@@ -46,7 +100,7 @@ class InMemoryFeatureStore final : public FeatureStore {
     return feature_dim_;
   }
 
-  [[nodiscard]] auto get_feature(NodeID_t node) const
+  [[nodiscard]] auto get_feature(NodeID node) const
       -> std::span<const float> override {
     return {data_[node]};
   }
@@ -58,8 +112,8 @@ class InMemoryFeatureStore final : public FeatureStore {
 };
 
 namespace detail {
-inline auto write_file(const std::string &db_path, const FeatureStore &features)
-    -> void {
+inline auto write_file(const std::string &db_path,
+                       const OldFeatureStore &features) -> void {
   std::cout << "Building graph at db_path: " << db_path << std::endl;
   std::ofstream out_file(db_path, std::ios::binary);
   if (!out_file) {
@@ -123,15 +177,15 @@ inline auto init(const Config &config) -> Context {
 }
 
 inline auto build(const Context &ctx,
-                  std::span<const std::pair<NodeID_t, NodeID_t>> edges,
-                  const FeatureStore &features) -> void {
+                  std::span<const std::pair<NodeID, NodeID>> edges,
+                  const OldFeatureStore &features) -> void {
   std::cout << "Number of edges: " << edges.size() << std::endl;
   std::cout << "Number of nodes: " << features.num_nodes() << std::endl;
   std::cout << "Feature Dim: " << features.feature_dim() << std::endl;
   detail::write_file(ctx.config.db_path, features);
 }
 
-inline auto gather(const Context &ctx, const std::vector<NodeID_t> &nodes)
+inline auto gather(const Context &ctx, const std::vector<NodeID> &nodes)
     -> std::vector<std::vector<float>> {
   const auto features = detail::read_file(ctx.config.db_path);
   const std::size_t batch_size = nodes.size();
@@ -147,5 +201,3 @@ inline auto gather(const Context &ctx, const std::vector<NodeID_t> &nodes)
 }
 
 }  // namespace ggb
-
-#endif  // GGB_H

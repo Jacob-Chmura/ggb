@@ -46,7 +46,8 @@ parse_args() {
 }
 
 configure_cmake() {
-    echo "Configuring CMake project (Build type: $BUILD_TYPE)..."
+    echo "Configuring CMake project (Build type: $BUILD_TYPE) in $BUILD_DIR"
+    mkdir -p "$BUILD_DIR"
     cd "$BUILD_DIR"
     cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
           -DGGB_BUILD_BENCHMARKS="$BUILD_BENCHMARKS" \

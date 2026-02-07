@@ -19,7 +19,7 @@ target_include_directories(${PROJECT_NAME} INTERFACE
         $<INSTALL_INTERFACE:include>
 )
 
-add_executable(test_ggb test/test_ggb.cc)
+add_executable(test_ggb test/test_ggb.cpp)
 target_link_libraries(test_ggb PRIVATE ${PROJECT_NAME})
 
 if (GGB_BUILD_BENCHMARKS)

@@ -11,7 +11,7 @@ constexpr std::string db_path = "test.ggb";
 const std::size_t num_nodes = 5;
 const std::size_t feature_dim = 3;
 
-using EdgeList = std::vector<std::pair<ggb::NodeID_t, ggb::NodeID_t>>;
+using EdgeList = std::vector<std::pair<ggb::NodeID, ggb::NodeID>>;
 using NodeFeatures = std::vector<std::vector<float>>;
 
 namespace {
@@ -52,7 +52,7 @@ auto main() -> int {
 
   ggb::build(ctx, edges, features);
 
-  std::vector<ggb::NodeID_t> nodes = {0, 1, 3};
+  std::vector<ggb::NodeID> nodes = {0, 1, 3};
   auto batch_feats = ggb::gather(ctx, nodes);
   for (std::size_t i = 0; i < nodes.size(); ++i) {
     std::cout << "Node: " << nodes[i] << " | Feat: [";
