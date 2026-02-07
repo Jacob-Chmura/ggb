@@ -45,12 +45,6 @@ parse_args() {
     done
 }
 
-clean_build_dir() {
-    echo "Cleaning previous build..."
-    rm -rf "$BUILD_DIR"
-    mkdir -p "$BUILD_DIR"
-}
-
 configure_cmake() {
     echo "Configuring CMake project (Build type: $BUILD_TYPE)..."
     cd "$BUILD_DIR"
@@ -63,20 +57,14 @@ configure_cmake() {
 }
 
 build_project() {
-    echo "Building project..."
     cmake --build . -- "-j$(nproc)"
 }
 
-copy_compile_commands() {
-    cp compile_commands.json "$PROJECT_ROOT/"
-}
 
 main() {
     parse_args "$@"
-    clean_build_dir
     configure_cmake
     build_project
-    copy_compile_commands
 }
 
 main "$@"
