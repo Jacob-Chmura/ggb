@@ -12,7 +12,7 @@
 
 namespace ggb::engine {
 
-namespace {
+namespace in_memory {
 
 class InMemoryFeatureStore final : public FeatureStore {
  public:
@@ -85,11 +85,11 @@ class InMemoryFeatureStoreBuilder final : public FeatureStoreBuilder {
       data_;
 };
 
-}  // namespace
+}  // namespace in_memory
 
 [[nodiscard]] auto create_in_memory_builder()
     -> std::unique_ptr<FeatureStoreBuilder> {
-  return std::make_unique<InMemoryFeatureStoreBuilder>();
+  return std::make_unique<in_memory::InMemoryFeatureStoreBuilder>();
 }
 
 }  // namespace ggb::engine

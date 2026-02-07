@@ -84,6 +84,8 @@ struct GGBConfig {
   const std::string db_path;
 };
 
+namespace detail {
+
 class GGBFeatureStore final : public FeatureStore {
  public:
   explicit GGBFeatureStore(
@@ -117,11 +119,8 @@ class GGBFeatureStore final : public FeatureStore {
     std::vector<std::optional<FeatureStoreValue>> results;
     results.reserve(keys.size());
 
-    std::ifstream file(cfg_.db_path, std::ios::binary);
-
     for (const auto &key : keys) {
       if (auto it = key_to_byte_.find(key); it != key_to_byte_.end()) {
-        // it->second is the byte offset, divide by sizeof(float) for the ptr
         const float *start = mapped_data_ + (it->second / sizeof(float));
         results.emplace_back(FeatureStoreValue(start, start + *tensor_size_));
       } else {
@@ -217,10 +216,11 @@ class GGBFeatureStoreBuilder final : public FeatureStoreBuilder {
   std::size_t offset_{0};
 };
 
+}  // namespace detail
+
 [[nodiscard]] inline auto create_ggb_builder(const GGBConfig &cfg)
     -> std::unique_ptr<FeatureStoreBuilder> {
-  return std::make_unique<GGBFeatureStoreBuilder>(cfg);
+  return std::make_unique<detail::GGBFeatureStoreBuilder>(cfg);
 }
-
 }  // namespace engine
 }  // namespace ggb
