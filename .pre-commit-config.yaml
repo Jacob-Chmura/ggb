@@ -112,5 +112,5 @@ repos:
         language: system
         files: \.(c|cc|cpp|cxx|h|hpp)$
         args:
-          - "-p=./"
+          - "-p=./build"
           - "--quiet"

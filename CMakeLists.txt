@@ -5,6 +5,7 @@ project(
     DESCRIPTION "Out-of-core gather implementation, specialized for GNN training workloads"
     LANGUAGES CXX
 )
+option(GGB_BUILD_BENCHMARKS "Build benchmark binaries" OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
@@ -18,10 +19,9 @@ target_include_directories(${PROJECT_NAME} INTERFACE
         $<INSTALL_INTERFACE:include>
 )
 
-add_executable(
-        test_ggb
-        test/test_ggb.cc
-)
-target_link_libraries(test_ggb PRIVATE
-        ${PROJECT_NAME}
-)
+add_executable(test_ggb test/test_ggb.cpp)
+target_link_libraries(test_ggb PRIVATE ${PROJECT_NAME})
+
+if (GGB_BUILD_BENCHMARKS)
+    add_subdirectory(bench)
+endif()
