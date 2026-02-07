@@ -1,3 +1,10 @@
+#include <iostream>
+
+#include "engines/engines.h"
 #include "timer.h"
 
-auto main() -> int { Timer timer{}; }
+auto main() -> int {
+  const Timer timer{};
+  const auto engine = ggb::engine::create_in_memory_engine();
+  std::cout << engine->name() << std::endl;
+}
