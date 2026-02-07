@@ -26,7 +26,8 @@ auto print_matrix(const NodeFeatures& data) -> void {
   }
 }
 
-auto generate_graph() -> std::pair<EdgeList, ggb::InMemoryOldFeatureStore> {
+auto generate_graph()
+    -> std::pair<EdgeList, ggb::deprecated::InMemoryOldFeatureStore> {
   const EdgeList edges = {{1, 4}, {1, 5}, {2, 3}, {4, 5}};
   NodeFeatures features(num_nodes, std::vector<float>(feature_dim));
 
@@ -40,20 +41,20 @@ auto generate_graph() -> std::pair<EdgeList, ggb::InMemoryOldFeatureStore> {
   }
   std::cout << "---------- FULL FEATURES ---------\n";
   ::print_matrix(features);
-  return {edges, ggb::InMemoryOldFeatureStore(features)};
+  return {edges, ggb::deprecated::InMemoryOldFeatureStore(features)};
 }
 }  // namespace
 
 auto main() -> int {
   auto [edges, features] = generate_graph();
 
-  const ggb::Config cfg = {.db_path = db_path};
-  auto ctx = ggb::init(cfg);
+  const ggb::deprecated::Config cfg = {.db_path = db_path};
+  auto ctx = ggb::deprecated::init(cfg);
 
-  ggb::build(ctx, edges, features);
+  ggb::deprecated::build(ctx, edges, features);
 
   std::vector<ggb::NodeID> nodes = {0, 1, 3};
-  auto batch_feats = ggb::gather(ctx, nodes);
+  auto batch_feats = ggb::deprecated::gather(ctx, nodes);
   for (std::size_t i = 0; i < nodes.size(); ++i) {
     std::cout << "Node: " << nodes[i] << " | Feat: [";
     for (auto feat : batch_feats[i]) {
