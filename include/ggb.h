@@ -10,6 +10,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -23,6 +24,11 @@ struct FeatureStoreKey {
   std::uint64_t NodeID;
 
   auto operator<=>(const FeatureStoreKey &) const = default;
+
+  friend auto operator<<(std::ostream &os, const FeatureStoreKey &key)
+      -> std::ostream & {
+    return os << "NodeID(" << key.NodeID << ")";
+  }
 };
 
 struct FeatureStoreKeyHash {
@@ -76,138 +82,142 @@ class FeatureEngine {
   [[nodiscard]] virtual auto name() const -> std::string_view = 0;
 };
 
-namespace deprecated {
-struct Config {
-  std::string db_path;
+namespace engine {
+
+struct GGBConfig {
+  const std::string db_path;
 };
 
-struct Context {
-  Config config;
-};
-
-class OldFeatureStore {
+class GGBFeatureStore final : public FeatureStore {
  public:
-  virtual ~OldFeatureStore() = default;
+  explicit GGBFeatureStore(
+      GGBConfig cfg,
+      std::unordered_map<FeatureStoreKey, std::size_t, FeatureStoreKeyHash>
+          &&key_to_byte,
+      std::optional<std::size_t> tensor_size)
+      : cfg_(std::move(cfg)),
+        key_to_byte_(std::move(key_to_byte)),
+        tensor_size_(tensor_size) {}
 
-  [[nodiscard]] virtual auto num_nodes() const -> std::size_t = 0;
-  [[nodiscard]] virtual auto feature_dim() const -> std::size_t = 0;
-  [[nodiscard]] virtual auto get_feature(NodeID node) const
-      -> std::span<const float> = 0;
-};
-
-class InMemoryOldFeatureStore final : public OldFeatureStore {
- public:
-  explicit InMemoryOldFeatureStore(std::vector<std::vector<float>> data)
-      : data_(std::move(data)),
-        num_nodes_(data_.size()),
-        feature_dim_(data_.empty() ? 0 : data_[0].size()) {}
-
-  [[nodiscard]] auto num_nodes() const -> std::size_t override {
-    return num_nodes_;
+  [[nodiscard]] auto get_num_keys() const -> std::size_t override {
+    return key_to_byte_.size();
   }
-  [[nodiscard]] auto feature_dim() const -> std::size_t override {
-    return feature_dim_;
+  [[nodiscard]] auto get_tensor_size() const
+      -> std::optional<std::size_t> override {
+    return tensor_size_;
   }
 
-  [[nodiscard]] auto get_feature(NodeID node) const
-      -> std::span<const float> override {
-    return {data_[node]};
+  [[nodiscard]] auto get_multi_tensor_async(
+      std::span<const FeatureStoreKey> keys) const
+      -> std::future<std::vector<std::optional<FeatureStoreValue>>> override {
+    std::vector<std::optional<FeatureStoreValue>> results;
+    results.reserve(keys.size());
+
+    std::ifstream file(cfg_.db_path, std::ios::binary);
+
+    for (const auto &key : keys) {
+      if (auto it = key_to_byte_.find(key); it != key_to_byte_.end()) {
+        file.seekg(it->second);
+        FeatureStoreValue val(tensor_size_.value());
+        file.read(reinterpret_cast<char *>(val.data()),
+                  tensor_size_.value() * sizeof(float));
+        results.emplace_back(std::move(val));
+      } else {
+        results.emplace_back(std::nullopt);
+      }
+    }
+    std::promise<std::vector<std::optional<FeatureStoreValue>>> promise;
+    promise.set_value(std::move(results));
+    return promise.get_future();
   }
 
  private:
-  std::vector<std::vector<float>> data_;
-  std::size_t num_nodes_ = 0;
-  std::size_t feature_dim_ = 0;
+  const GGBConfig cfg_;
+  const std::unordered_map<FeatureStoreKey, std::size_t, FeatureStoreKeyHash>
+      key_to_byte_;
+  const std::optional<std::size_t> tensor_size_;
 };
 
-namespace detail {
-inline auto write_file(const std::string &db_path,
-                       const OldFeatureStore &features) -> void {
-  std::cout << "Building graph at db_path: " << db_path << std::endl;
-  std::ofstream out_file(db_path, std::ios::binary);
-  if (!out_file) {
-    std::cerr << "Error opening file: " << db_path << std::endl;
-    return;
-  }
+class GGBFeatureStoreBuilder final : public FeatureStoreBuilder {
+ public:
+  explicit GGBFeatureStoreBuilder(const GGBConfig &cfg)
+      : cfg_(cfg), out_file_(cfg.db_path, std::ios::binary) {}
 
-  const auto num_nodes = features.num_nodes();
-  const auto feature_dim = features.feature_dim();
-  if (num_nodes == 0 || feature_dim == 0) {
-    std::cerr << "Got empty node features\n";
-    return;
-  }
-
-  out_file.write(reinterpret_cast<const char *>(&num_nodes), sizeof(num_nodes));
-  out_file.write(reinterpret_cast<const char *>(&feature_dim),
-                 sizeof(feature_dim));
-  for (std::size_t node = 0; node < num_nodes; ++node) {
-    const auto feat = features.get_feature(node);
-    if (feat.size() != feature_dim) {
-      std::cerr << "Row has wrong feature size\n";
-      return;
+  auto put_tensor(const FeatureStoreKey &key, const FeatureStoreValue &tensor)
+      -> bool override {
+    if (!out_file_) {
+      std::cerr << "Could not write to file: " << cfg_.db_path << "\n";
+      return false;
     }
-    out_file.write(reinterpret_cast<const char *>(feat.data()),
-                   feature_dim * sizeof(feat[0]));
+
+    if (key_to_byte_.contains(key)) {
+      // TODO(kuba): Enable put overrides before build()
+      std::cerr << key << " already present, skipping `put`\n";
+      return false;
+    }
+
+    if (tensor_size_.has_value() && tensor.size() != tensor_size_.value()) {
+      // TODO(kuba): Support various tensor sizes
+      std::cerr << "Requested `put` on tensor of size '" << tensor.size()
+                << "' but previously `put` a tensor of size '"
+                << tensor_size_.value()
+                << "'. Different tensor shapes are not yet supported\n";
+      return false;
+    }
+    tensor_size_ = tensor.size();
+
+    // do write
+    key_to_byte_[key] = curr_offset_;
+    auto bytes_to_write = tensor_size_.value() * sizeof(float);
+    out_file_.write(reinterpret_cast<const char *>(tensor.data()),
+                    bytes_to_write);
+    curr_offset_ += bytes_to_write;
+    return true;
   }
+
+  auto put_tensor(const FeatureStoreKey &key, FeatureStoreValue &&tensor)
+      -> bool override {
+    // TODO(kuba): shoudl we do std::forward of somethign?
+    return put_tensor(key, tensor);
+  }
+
+  [[nodiscard]] auto build(
+      [[maybe_unused]] std::optional<GraphTopology> graph = std::nullopt)
+      -> std::unique_ptr<FeatureStore> override {
+    out_file_.close();  // TODO(kuba): RAII
+    return std::make_unique<GGBFeatureStore>(cfg_, std::move(key_to_byte_),
+                                             std::move(tensor_size_));
+  }
+
+ private:
+  const GGBConfig cfg_;
+  std::ofstream out_file_;
+  std::unordered_map<FeatureStoreKey, std::size_t, FeatureStoreKeyHash>
+      key_to_byte_;
+  std::optional<std::size_t> tensor_size_;
+  std::size_t curr_offset_{0};
+};
+
+class GGBFeatureEngine : public FeatureEngine {
+ public:
+  explicit GGBFeatureEngine(GGBConfig cfg) : cfg_(std::move(cfg)) {}
+
+  [[nodiscard]] auto create_builder()
+      -> std::unique_ptr<FeatureStoreBuilder> override {
+    return std::make_unique<GGBFeatureStoreBuilder>(cfg_);
+  }
+
+  [[nodiscard]] auto name() const -> std::string_view override { return name_; }
+
+ private:
+  static constexpr std::string_view name_ = "GGBFeatureEngine";
+  const GGBConfig cfg_;
+};
+
+[[nodiscard]] inline auto create_ggb_engine(const GGBConfig &cfg)
+    -> std::unique_ptr<FeatureEngine> {
+  return std::make_unique<GGBFeatureEngine>(cfg);
 }
 
-inline auto read_file(const std::string &db_path) -> InMemoryOldFeatureStore {
-  std::cout << "Reading graph at db_path: " << db_path << std::endl;
-  std::ifstream in_file(db_path, std::ios::binary);
-  if (!in_file) {
-    std::cerr << "Error opening file: " << db_path << std::endl;
-    return InMemoryOldFeatureStore({});
-  }
-
-  std::size_t num_nodes = 0;
-  std::size_t feature_dim = 0;
-  in_file.read(reinterpret_cast<char *>(&num_nodes), sizeof(num_nodes));
-  in_file.read(reinterpret_cast<char *>(&feature_dim), sizeof(feature_dim));
-
-  if (num_nodes == 0 || feature_dim == 0) {
-    std::cerr << "Got empty node features\n";
-    return InMemoryOldFeatureStore({});
-  }
-
-  std::vector<std::vector<float>> features(num_nodes,
-                                           std::vector<float>(feature_dim));
-  for (std::size_t i = 0; i < num_nodes; ++i) {
-    in_file.read(reinterpret_cast<char *>(features[i].data()),
-                 feature_dim * sizeof(float));
-  }
-  return InMemoryOldFeatureStore(features);
-}
-
-}  // namespace detail
-
-inline auto init(const Config &config) -> Context {
-  Context ctx = {.config = config};
-  return ctx;
-}
-
-inline auto build(const Context &ctx,
-                  std::span<const std::pair<NodeID, NodeID>> edges,
-                  const OldFeatureStore &features) -> void {
-  std::cout << "Number of edges: " << edges.size() << std::endl;
-  std::cout << "Number of nodes: " << features.num_nodes() << std::endl;
-  std::cout << "Feature Dim: " << features.feature_dim() << std::endl;
-  detail::write_file(ctx.config.db_path, features);
-}
-
-inline auto gather(const Context &ctx, const std::vector<NodeID> &nodes)
-    -> std::vector<std::vector<float>> {
-  const auto features = detail::read_file(ctx.config.db_path);
-  const std::size_t batch_size = nodes.size();
-  const std::size_t feature_dim = features.feature_dim();
-
-  std::vector<std::vector<float>> batch_features(
-      batch_size, std::vector<float>(feature_dim));
-  for (std::size_t i = 0; i < nodes.size(); ++i) {
-    const auto feat = features.get_feature(nodes[i]);
-    batch_features[i].assign(feat.begin(), feat.end());
-  }
-  return batch_features;
-}
-
-}  // namespace deprecated
+}  // namespace engine
 }  // namespace ggb

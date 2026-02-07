@@ -11,56 +11,59 @@ constexpr std::string db_path = "test.ggb";
 const std::size_t num_nodes = 5;
 const std::size_t feature_dim = 3;
 
-using EdgeList = std::vector<std::pair<ggb::NodeID, ggb::NodeID>>;
-using NodeFeatures = std::vector<std::vector<float>>;
-
 namespace {
-
-auto print_matrix(const NodeFeatures& data) -> void {
-  for (std::size_t i = 0; i < data.size(); ++i) {
-    std::cout << "Node: " << i << " | Feat: [";
-    for (auto feat : data[i]) {
-      std::cout << feat << ", ";
-    }
-    std::cout << "]\n";
+void print_feature_row(ggb::FeatureStoreKey key,
+                       const std::optional<ggb::FeatureStoreValue>& feat) {
+  std::cout << "Node: " << key << " | Feat: ";
+  if (!feat.has_value()) {
+    std::cout << "[Not Found]\n";
+    return;
   }
+  std::cout << "[";
+  for (auto val : feat.value()) {
+    std::cout << val << (val == feat->back() ? "" : ", ");
+  }
+  std::cout << "]\n";
 }
 
-auto generate_graph()
-    -> std::pair<EdgeList, ggb::deprecated::InMemoryOldFeatureStore> {
-  const EdgeList edges = {{1, 4}, {1, 5}, {2, 3}, {4, 5}};
-  NodeFeatures features(num_nodes, std::vector<float>(feature_dim));
-
+void ingest_data(ggb::FeatureStoreBuilder& builder) {
   std::random_device rng;
   std::mt19937 engine(rng());
+  std::uniform_real_distribution<float> dist(0.0F, 1.0F);
+
+  std::cout << "---------- INGESTING FEATURES ---------\n";
   for (std::size_t i = 0; i < num_nodes; ++i) {
-    for (std::size_t j = 0; j < feature_dim; ++j) {
-      std::uniform_real_distribution<float> dist(0.0F, 1.0F);
-      features[i][j] = dist(engine);
+    ggb::FeatureStoreValue tensor(feature_dim);
+    for (auto& val : tensor) {
+      val = dist(engine);
     }
+
+    ggb::FeatureStoreKey key{static_cast<std::uint64_t>(i)};
+    print_feature_row(key, tensor);
+    builder.put_tensor(key, std::move(tensor));
   }
-  std::cout << "---------- FULL FEATURES ---------\n";
-  ::print_matrix(features);
-  return {edges, ggb::deprecated::InMemoryOldFeatureStore(features)};
 }
 }  // namespace
 
 auto main() -> int {
-  auto [edges, features] = generate_graph();
+  ggb::engine::GGBConfig cfg{.db_path = db_path};
+  auto engine = ggb::engine::create_ggb_engine(cfg);
+  auto builder = engine->create_builder();
+  ingest_data(*builder);
 
-  const ggb::deprecated::Config cfg = {.db_path = db_path};
-  auto ctx = ggb::deprecated::init(cfg);
+  std::cout << "\nFinalizing Store (Building flat file)...\n";
+  auto store = builder->build();
 
-  ggb::deprecated::build(ctx, edges, features);
+  std::cout << "\n------------ GATHER RESULTS -----------\n";
 
-  std::vector<ggb::NodeID> nodes = {0, 1, 3};
-  auto batch_feats = ggb::deprecated::gather(ctx, nodes);
-  for (std::size_t i = 0; i < nodes.size(); ++i) {
-    std::cout << "Node: " << nodes[i] << " | Feat: [";
-    for (auto feat : batch_feats[i]) {
-      std::cout << feat << ", ";
-    }
-    std::cout << "]\n";
+  std::vector<ggb::FeatureStoreKey> query_keys = {
+      {0}, {1}, {3}, {99}  // 99 tests the 'nullopt' case
+  };
+
+  auto results = store->get_multi_tensor(query_keys);
+  for (std::size_t i = 0; i < query_keys.size(); ++i) {
+    print_feature_row(query_keys[i], results[i]);
   }
+
   return 0;
 }
