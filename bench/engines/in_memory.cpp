@@ -16,9 +16,7 @@ namespace in_memory {
 
 class InMemoryFeatureStore final : public FeatureStore {
  public:
-  explicit InMemoryFeatureStore(
-      std::unordered_map<FeatureStoreKey, FeatureStoreValue,
-                         FeatureStoreKeyHash> &&data)
+  explicit InMemoryFeatureStore(std::unordered_map<Key, Value, KeyHash> &&data)
       : data_(std::move(data)) {}
 
   [[nodiscard]] auto name() const -> std::string_view override { return name_; }
@@ -34,10 +32,9 @@ class InMemoryFeatureStore final : public FeatureStore {
     return data_.begin()->second.size();
   }
 
-  [[nodiscard]] auto get_multi_tensor_async(
-      std::span<const FeatureStoreKey> keys) const
-      -> std::future<std::vector<std::optional<FeatureStoreValue>>> override {
-    std::vector<std::optional<FeatureStoreValue>> results;
+  [[nodiscard]] auto get_multi_tensor_async(std::span<const Key> keys) const
+      -> std::future<std::vector<std::optional<Value>>> override {
+    std::vector<std::optional<Value>> results;
     results.reserve(keys.size());
 
     for (const auto &key : keys) {
@@ -48,28 +45,24 @@ class InMemoryFeatureStore final : public FeatureStore {
       }
     }
 
-    std::promise<std::vector<std::optional<FeatureStoreValue>>> promise;
+    std::promise<std::vector<std::optional<Value>>> promise;
     promise.set_value(std::move(results));
     return promise.get_future();
   }
 
  private:
   static constexpr std::string_view name_ = "InMemoryFeatureStore";
-  const std::unordered_map<FeatureStoreKey, FeatureStoreValue,
-                           FeatureStoreKeyHash>
-      data_;
+  const std::unordered_map<Key, Value, KeyHash> data_;
 };
 
 class InMemoryFeatureStoreBuilder final : public FeatureStoreBuilder {
  public:
-  auto put_tensor(const FeatureStoreKey &key, const FeatureStoreValue &tensor)
-      -> bool override {
+  auto put_tensor(const Key &key, const Value &tensor) -> bool override {
     data_[key] = tensor;
     return true;
   }
 
-  auto put_tensor(const FeatureStoreKey &key, FeatureStoreValue &&tensor)
-      -> bool override {
+  auto put_tensor(const Key &key, Value &&tensor) -> bool override {
     data_[key] = std::move(tensor);
     return true;
   }
@@ -81,8 +74,7 @@ class InMemoryFeatureStoreBuilder final : public FeatureStoreBuilder {
   }
 
  private:
-  std::unordered_map<FeatureStoreKey, FeatureStoreValue, FeatureStoreKeyHash>
-      data_;
+  std::unordered_map<Key, Value, KeyHash> data_;
 };
 
 }  // namespace in_memory

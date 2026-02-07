@@ -12,8 +12,7 @@ const std::size_t num_nodes = 5;
 const std::size_t feature_dim = 3;
 
 namespace {
-void print_feature_row(ggb::FeatureStoreKey key,
-                       const std::optional<ggb::FeatureStoreValue>& feat) {
+void print_feature_row(ggb::Key key, const std::optional<ggb::Value>& feat) {
   std::cout << "Node: " << key << " | Feat: ";
   if (!feat.has_value()) {
     std::cout << "[Not Found]\n";
@@ -33,12 +32,12 @@ void ingest_data(ggb::FeatureStoreBuilder& builder) {
 
   std::cout << "---------- INGESTING FEATURES ---------\n";
   for (std::size_t i = 0; i < num_nodes; ++i) {
-    ggb::FeatureStoreValue tensor(feature_dim);
+    ggb::Value tensor(feature_dim);
     for (auto& val : tensor) {
       val = dist(engine);
     }
 
-    ggb::FeatureStoreKey key{static_cast<std::uint64_t>(i)};
+    ggb::Key key{static_cast<std::uint64_t>(i)};
     print_feature_row(key, tensor);
     builder.put_tensor(key, std::move(tensor));
   }
@@ -52,7 +51,7 @@ auto main() -> int {
   auto store = builder->build();
 
   std::cout << "\n------------ GATHER RESULTS -----------\n";
-  std::vector<ggb::FeatureStoreKey> query_keys = {
+  std::vector<ggb::Key> query_keys = {
       {0}, {1}, {3}, {99}  // 99 tests the 'nullopt' case
   };
 

@@ -23,22 +23,21 @@
 namespace ggb {
 
 using NodeID = std::uint64_t;
-using FeatureStoreValue = std::vector<float>;
+using Value = std::vector<float>;
 
-struct FeatureStoreKey {
+struct Key {
   // For now, we only support homogenous node keys
   std::uint64_t NodeID;
 
-  auto operator<=>(const FeatureStoreKey &) const = default;
+  auto operator<=>(const Key &) const = default;
 
-  friend auto operator<<(std::ostream &os, const FeatureStoreKey &key)
-      -> std::ostream & {
+  friend auto operator<<(std::ostream &os, const Key &key) -> std::ostream & {
     return os << "NodeID(" << key.NodeID << ")";
   }
 };
 
-struct FeatureStoreKeyHash {
-  auto operator()(const FeatureStoreKey &key) const noexcept -> std::size_t {
+struct KeyHash {
+  auto operator()(const Key &key) const noexcept -> std::size_t {
     return key.NodeID;
   }
 };
@@ -56,12 +55,11 @@ class FeatureStore {
   [[nodiscard]] virtual auto get_tensor_size() const
       -> std::optional<std::size_t> = 0;
 
-  [[nodiscard]] virtual auto get_multi_tensor_async(
-      std::span<const FeatureStoreKey> keys) const
-      -> std::future<std::vector<std::optional<FeatureStoreValue>>> = 0;
+  [[nodiscard]] virtual auto get_multi_tensor_async(std::span<const Key> keys)
+      const -> std::future<std::vector<std::optional<Value>>> = 0;
 
-  [[nodiscard]] auto get_multi_tensor(std::span<const FeatureStoreKey> keys)
-      const -> std::vector<std::optional<FeatureStoreValue>> {
+  [[nodiscard]] auto get_multi_tensor(std::span<const Key> keys) const
+      -> std::vector<std::optional<Value>> {
     return get_multi_tensor_async(keys).get();
   }
 };
@@ -70,10 +68,8 @@ class FeatureStoreBuilder {
  public:
   virtual ~FeatureStoreBuilder() = default;
 
-  virtual auto put_tensor(const FeatureStoreKey &key,
-                          const FeatureStoreValue &tensor) -> bool = 0;
-  virtual auto put_tensor(const FeatureStoreKey &key,
-                          FeatureStoreValue &&tensor) -> bool = 0;
+  virtual auto put_tensor(const Key &key, const Value &tensor) -> bool = 0;
+  virtual auto put_tensor(const Key &key, Value &&tensor) -> bool = 0;
   virtual auto build(std::optional<GraphTopology> graph = std::nullopt)
       -> std::unique_ptr<FeatureStore> = 0;
 };
@@ -90,8 +86,7 @@ class GGBFeatureStore final : public FeatureStore {
  public:
   explicit GGBFeatureStore(
       GGBConfig cfg,
-      std::unordered_map<FeatureStoreKey, std::size_t, FeatureStoreKeyHash>
-          &&key_to_byte,
+      std::unordered_map<Key, std::size_t, KeyHash> &&key_to_byte,
       std::optional<std::size_t> tensor_size)
       : cfg_(std::move(cfg)),
         key_to_byte_(std::move(key_to_byte)),
@@ -113,21 +108,20 @@ class GGBFeatureStore final : public FeatureStore {
     return tensor_size_;
   }
 
-  [[nodiscard]] auto get_multi_tensor_async(
-      std::span<const FeatureStoreKey> keys) const
-      -> std::future<std::vector<std::optional<FeatureStoreValue>>> override {
-    std::vector<std::optional<FeatureStoreValue>> results;
+  [[nodiscard]] auto get_multi_tensor_async(std::span<const Key> keys) const
+      -> std::future<std::vector<std::optional<Value>>> override {
+    std::vector<std::optional<Value>> results;
     results.reserve(keys.size());
 
     for (const auto &key : keys) {
       if (auto it = key_to_byte_.find(key); it != key_to_byte_.end()) {
         const float *start = mapped_data_ + (it->second / sizeof(float));
-        results.emplace_back(FeatureStoreValue(start, start + *tensor_size_));
+        results.emplace_back(Value(start, start + *tensor_size_));
       } else {
         results.emplace_back(std::nullopt);
       }
     }
-    std::promise<std::vector<std::optional<FeatureStoreValue>>> promise;
+    std::promise<std::vector<std::optional<Value>>> promise;
     promise.set_value(std::move(results));
     return promise.get_future();
   }
@@ -135,8 +129,7 @@ class GGBFeatureStore final : public FeatureStore {
  private:
   static constexpr std::string_view name_ = "GGBFeatureStore";
   const GGBConfig cfg_;
-  const std::unordered_map<FeatureStoreKey, std::size_t, FeatureStoreKeyHash>
-      key_to_byte_;
+  const std::unordered_map<Key, std::size_t, KeyHash> key_to_byte_;
   const std::optional<std::size_t> tensor_size_;
 
   const float *mapped_data_ = nullptr;
@@ -169,8 +162,7 @@ class GGBFeatureStoreBuilder final : public FeatureStoreBuilder {
   explicit GGBFeatureStoreBuilder(const GGBConfig &cfg)
       : cfg_(cfg), out_file_(cfg.db_path, std::ios::binary) {}
 
-  auto put_tensor(const FeatureStoreKey &key, const FeatureStoreValue &tensor)
-      -> bool override {
+  auto put_tensor(const Key &key, const Value &tensor) -> bool override {
     if (!out_file_) {
       std::cerr << "Could not write to file: " << cfg_.db_path << "\n";
       return false;
@@ -186,17 +178,16 @@ class GGBFeatureStoreBuilder final : public FeatureStoreBuilder {
     tensor_size_ = tensor.size();
 
     // Note: If key exists, we simply overwrite the offset in the map.
-    key_to_byte_[key] = offset_;
+    key_to_byte_[key] = write_pos_;
     auto bytes_to_write = tensor_size_.value() * sizeof(float);
     out_file_.write(reinterpret_cast<const char *>(tensor.data()),
                     bytes_to_write);
-    offset_ += bytes_to_write;
+    write_pos_ += bytes_to_write;
     return true;
   }
 
-  auto put_tensor(const FeatureStoreKey &key, FeatureStoreValue &&tensor)
-      -> bool override {
-    return put_tensor(key, static_cast<const FeatureStoreValue &>(tensor));
+  auto put_tensor(const Key &key, Value &&tensor) -> bool override {
+    return put_tensor(key, static_cast<const Value &>(tensor));
   }
 
   [[nodiscard]] auto build(
@@ -210,10 +201,9 @@ class GGBFeatureStoreBuilder final : public FeatureStoreBuilder {
  private:
   const GGBConfig cfg_;
   std::ofstream out_file_;
-  std::unordered_map<FeatureStoreKey, std::size_t, FeatureStoreKeyHash>
-      key_to_byte_;
+  std::unordered_map<Key, std::size_t, KeyHash> key_to_byte_;
   std::optional<std::size_t> tensor_size_;
-  std::size_t offset_{0};
+  std::size_t write_pos_{0};
 };
 
 }  // namespace detail
