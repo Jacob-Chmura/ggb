@@ -46,13 +46,10 @@ void ingest_data(ggb::FeatureStoreBuilder& builder) {
 }  // namespace
 
 auto main() -> int {
-  auto store = ggb::engine::create_ggb_store({.db_path = db_path});
-  {
-    auto builder = store->create_builder();
-    ingest_data(*builder);
-    std::cout << "\nFinalizing Store (Building flat file)...\n";
-    builder->commit();
-  }
+  auto builder = ggb::engine::create_ggb_builder({.db_path = db_path});
+  ingest_data(*builder);
+  std::cout << "\nFinalizing Store (Building flat file)...\n";
+  auto store = builder->build();
 
   std::cout << "\n------------ GATHER RESULTS -----------\n";
   std::vector<ggb::FeatureStoreKey> query_keys = {

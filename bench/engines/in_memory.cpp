@@ -14,36 +14,13 @@ namespace ggb::engine {
 
 namespace {
 
-class InMemoryFeatureStore;
-
-class InMemoryFeatureStoreBuilder final : public FeatureStoreBuilder {
- public:
-  explicit InMemoryFeatureStoreBuilder(InMemoryFeatureStore &parent)
-      : parent_(parent) {}
-
-  auto put_tensor(const FeatureStoreKey &key, const FeatureStoreValue &tensor)
-      -> bool override {
-    data_[key] = tensor;
-    return true;
-  }
-
-  auto put_tensor(const FeatureStoreKey &key, FeatureStoreValue &&tensor)
-      -> bool override {
-    data_[key] = std::move(tensor);
-    return true;
-  }
-
-  auto commit([[maybe_unused]] std::optional<GraphTopology> graph =
-                  std::nullopt) -> void override;
-
- private:
-  InMemoryFeatureStore &parent_;
-  std::unordered_map<FeatureStoreKey, FeatureStoreValue, FeatureStoreKeyHash>
-      data_;
-};
-
 class InMemoryFeatureStore final : public FeatureStore {
  public:
+  explicit InMemoryFeatureStore(
+      std::unordered_map<FeatureStoreKey, FeatureStoreValue,
+                         FeatureStoreKeyHash> &&data)
+      : data_(std::move(data)) {}
+
   [[nodiscard]] auto name() const -> std::string_view override { return name_; }
 
   [[nodiscard]] auto get_num_keys() const -> std::size_t override {
@@ -76,32 +53,43 @@ class InMemoryFeatureStore final : public FeatureStore {
     return promise.get_future();
   }
 
-  [[nodiscard]] auto create_builder()
-      -> std::unique_ptr<FeatureStoreBuilder> override {
-    return std::make_unique<InMemoryFeatureStoreBuilder>(*this);
+ private:
+  static constexpr std::string_view name_ = "InMemoryFeatureStore";
+  const std::unordered_map<FeatureStoreKey, FeatureStoreValue,
+                           FeatureStoreKeyHash>
+      data_;
+};
+
+class InMemoryFeatureStoreBuilder final : public FeatureStoreBuilder {
+ public:
+  auto put_tensor(const FeatureStoreKey &key, const FeatureStoreValue &tensor)
+      -> bool override {
+    data_[key] = tensor;
+    return true;
+  }
+
+  auto put_tensor(const FeatureStoreKey &key, FeatureStoreValue &&tensor)
+      -> bool override {
+    data_[key] = std::move(tensor);
+    return true;
+  }
+
+  [[nodiscard]] auto build(
+      [[maybe_unused]] std::optional<GraphTopology> graph = std::nullopt)
+      -> std::unique_ptr<FeatureStore> override {
+    return std::make_unique<InMemoryFeatureStore>(std::move(data_));
   }
 
  private:
-  static constexpr std::string_view name_ = "InMemoryFeatureStore";
   std::unordered_map<FeatureStoreKey, FeatureStoreValue, FeatureStoreKeyHash>
       data_;
-
-  friend class InMemoryFeatureStoreBuilder;
 };
-
-inline auto InMemoryFeatureStoreBuilder::commit(
-    [[maybe_unused]] std::optional<GraphTopology> graph) -> void {
-  // Merge the buffer into the parent's data
-  for (auto &[key, value] : data_) {
-    parent_.data_[key] = std::move(value);
-  }
-  data_.clear();
-}
 
 }  // namespace
 
-[[nodiscard]] auto create_in_memory_store() -> std::unique_ptr<FeatureStore> {
-  return std::make_unique<InMemoryFeatureStore>();
+[[nodiscard]] auto create_in_memory_builder()
+    -> std::unique_ptr<FeatureStoreBuilder> {
+  return std::make_unique<InMemoryFeatureStoreBuilder>();
 }
 
 }  // namespace ggb::engine
