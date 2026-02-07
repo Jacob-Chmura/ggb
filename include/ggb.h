@@ -1,5 +1,11 @@
 #pragma once
 
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -97,11 +103,33 @@ class GGBFeatureStore final : public FeatureStore {
       std::optional<std::size_t> tensor_size)
       : cfg_(std::move(cfg)),
         key_to_byte_(std::move(key_to_byte)),
-        tensor_size_(tensor_size) {}
+        tensor_size_(tensor_size) {
+    auto fd = open(cfg_.db_path.c_str(), O_RDONLY);
+    if (fd == -1) {
+      // TODO(kuba): switch to std::format
+      std::string err_msg = "Could not open " + cfg_.db_path + " for mmap\n";
+      throw std::runtime_error(err_msg);
+    }
+
+    file_size_ = lseek(fd, 0, SEEK_END);
+    mapped_data_ = static_cast<const float *>(
+        mmap(nullptr, file_size_, PROT_READ, MAP_SHARED, fd, 0));
+    close(fd);
+    if (mapped_data_ == MAP_FAILED) {
+      throw std::runtime_error("mmap failed");
+    }
+  }
+
+  ~GGBFeatureStore() override {
+    if (mapped_data_ != MAP_FAILED) {
+      munmap(const_cast<float *>(mapped_data_), file_size_);
+    }
+  }
 
   [[nodiscard]] auto get_num_keys() const -> std::size_t override {
     return key_to_byte_.size();
   }
+
   [[nodiscard]] auto get_tensor_size() const
       -> std::optional<std::size_t> override {
     return tensor_size_;
@@ -117,11 +145,9 @@ class GGBFeatureStore final : public FeatureStore {
 
     for (const auto &key : keys) {
       if (auto it = key_to_byte_.find(key); it != key_to_byte_.end()) {
-        file.seekg(it->second);
-        FeatureStoreValue val(tensor_size_.value());
-        file.read(reinterpret_cast<char *>(val.data()),
-                  tensor_size_.value() * sizeof(float));
-        results.emplace_back(std::move(val));
+        // it->second is the byte offset, divide by sizeof(float) for the ptr
+        const float *start = mapped_data_ + (it->second / sizeof(float));
+        results.emplace_back(FeatureStoreValue(start, start + *tensor_size_));
       } else {
         results.emplace_back(std::nullopt);
       }
@@ -136,6 +162,9 @@ class GGBFeatureStore final : public FeatureStore {
   const std::unordered_map<FeatureStoreKey, std::size_t, FeatureStoreKeyHash>
       key_to_byte_;
   const std::optional<std::size_t> tensor_size_;
+
+  const float *mapped_data_ = nullptr;
+  std::size_t file_size_{0};
 };
 
 class GGBFeatureStoreBuilder final : public FeatureStoreBuilder {
@@ -150,12 +179,6 @@ class GGBFeatureStoreBuilder final : public FeatureStoreBuilder {
       return false;
     }
 
-    if (key_to_byte_.contains(key)) {
-      // TODO(kuba): Enable put overrides before build()
-      std::cerr << key << " already present, skipping `put`\n";
-      return false;
-    }
-
     if (tensor_size_.has_value() && tensor.size() != tensor_size_.value()) {
       // TODO(kuba): Support various tensor sizes
       std::cerr << "Requested `put` on tensor of size '" << tensor.size()
@@ -166,7 +189,8 @@ class GGBFeatureStoreBuilder final : public FeatureStoreBuilder {
     }
     tensor_size_ = tensor.size();
 
-    // do write
+    // Note: If key exists, we simply overwrite the offset in the map.
+    // The old data remains "tombstoned" (no longer reachable).
     key_to_byte_[key] = curr_offset_;
     auto bytes_to_write = tensor_size_.value() * sizeof(float);
     out_file_.write(reinterpret_cast<const char *>(tensor.data()),
@@ -177,14 +201,16 @@ class GGBFeatureStoreBuilder final : public FeatureStoreBuilder {
 
   auto put_tensor(const FeatureStoreKey &key, FeatureStoreValue &&tensor)
       -> bool override {
-    // TODO(kuba): shoudl we do std::forward of somethign?
-    return put_tensor(key, tensor);
+    return put_tensor(key, static_cast<const FeatureStoreValue &>(tensor));
   }
 
   [[nodiscard]] auto build(
       [[maybe_unused]] std::optional<GraphTopology> graph = std::nullopt)
       -> std::unique_ptr<FeatureStore> override {
-    out_file_.close();  // TODO(kuba): RAII
+    if (out_file_.is_open()) {
+      out_file_.flush();
+      out_file_.close();
+    }
     return std::make_unique<GGBFeatureStore>(cfg_, std::move(key_to_byte_),
                                              std::move(tensor_size_));
   }
