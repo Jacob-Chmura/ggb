@@ -26,7 +26,7 @@ auto print_matrix(const NodeFeatures& data) -> void {
   }
 }
 
-auto generate_graph() -> std::pair<EdgeList, ggb::InMemoryFeatureStore> {
+auto generate_graph() -> std::pair<EdgeList, ggb::InMemoryOldFeatureStore> {
   const EdgeList edges = {{1, 4}, {1, 5}, {2, 3}, {4, 5}};
   NodeFeatures features(num_nodes, std::vector<float>(feature_dim));
 
@@ -40,7 +40,7 @@ auto generate_graph() -> std::pair<EdgeList, ggb::InMemoryFeatureStore> {
   }
   std::cout << "---------- FULL FEATURES ---------\n";
   ::print_matrix(features);
-  return {edges, ggb::InMemoryFeatureStore(features)};
+  return {edges, ggb::InMemoryOldFeatureStore(features)};
 }
 }  // namespace
 

@@ -10,6 +10,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -23,6 +24,12 @@ struct FeatureStoreKey {
   std::uint64_t NodeID;
 
   auto operator<=>(const FeatureStoreKey &) const = default;
+};
+
+struct FeatureStoreKeyHash {
+  auto operator()(const FeatureStoreKey &key) const noexcept -> std::size_t {
+    return key.NodeID;
+  }
 };
 
 struct GraphTopology {
@@ -39,10 +46,10 @@ class FeatureStore {
 
   [[nodiscard]] virtual auto get_multi_tensor_async(
       std::span<const FeatureStoreKey> keys) const
-      -> std::future<std::vector<FeatureStoreValue>> = 0;
+      -> std::future<std::vector<std::optional<FeatureStoreValue>>> = 0;
 
   [[nodiscard]] auto get_multi_tensor(std::span<const FeatureStoreKey> keys)
-      const -> std::vector<FeatureStoreValue> {
+      const -> std::vector<std::optional<FeatureStoreValue>> {
     return get_multi_tensor_async(keys).get();
   }
 };
@@ -53,6 +60,8 @@ class FeatureStoreBuilder {
 
   virtual auto put_tensor(const FeatureStoreKey &key,
                           const FeatureStoreValue &tensor) -> bool = 0;
+  virtual auto put_tensor(const FeatureStoreKey &key,
+                          FeatureStoreValue &&tensor) -> bool = 0;
 
   [[nodiscard]] virtual auto build(
       std::optional<GraphTopology> graph = std::nullopt)
@@ -66,6 +75,87 @@ class FeatureEngine {
       -> std::unique_ptr<FeatureStoreBuilder> = 0;
 
   [[nodiscard]] virtual auto name() const -> std::string_view = 0;
+};
+
+class InMemoryFeatureStore final : public FeatureStore {
+ public:
+  explicit InMemoryFeatureStore(
+      std::unordered_map<FeatureStoreKey, FeatureStoreValue,
+                         FeatureStoreKeyHash> &&data)
+      : data_(std::move(data)) {}
+
+  [[nodiscard]] auto get_num_keys() const -> std::size_t override {
+    return data_.size();
+  }
+  [[nodiscard]] auto get_tensor_size() const
+      -> std::optional<std::size_t> override {
+    if (data_.empty()) {
+      return std::nullopt;
+    }
+    return data_.begin()->second.size();
+  }
+
+  [[nodiscard]] auto get_multi_tensor_async(
+      std::span<const FeatureStoreKey> keys) const
+      -> std::future<std::vector<std::optional<FeatureStoreValue>>> override {
+    std::vector<std::optional<FeatureStoreValue>> results;
+    results.reserve(keys.size());
+
+    for (const auto &key : keys) {
+      if (auto it = data_.find(key); it != data_.end()) {
+        results.emplace_back(it->second);
+      } else {
+        results.emplace_back(std::nullopt);
+      }
+    }
+
+    std::promise<std::vector<std::optional<FeatureStoreValue>>> promise;
+    promise.set_value(std::move(results));
+    return promise.get_future();
+  }
+
+ private:
+  const std::unordered_map<FeatureStoreKey, FeatureStoreValue,
+                           FeatureStoreKeyHash>
+      data_;
+};
+
+class InMemoryFeatureStoreBuilder final : public FeatureStoreBuilder {
+ public:
+  auto put_tensor(const FeatureStoreKey &key, const FeatureStoreValue &tensor)
+      -> bool override {
+    data_[key] = tensor;
+    return true;
+  }
+
+  auto put_tensor(const FeatureStoreKey &key, FeatureStoreValue &&tensor)
+      -> bool override {
+    data_[key] = std::move(tensor);
+    return true;
+  }
+
+  [[nodiscard]] auto build(
+      [[maybe_unused]] std::optional<GraphTopology> graph = std::nullopt)
+      -> std::unique_ptr<FeatureStore> override {
+    return std::make_unique<InMemoryFeatureStore>(std::move(data_));
+  }
+
+ private:
+  std::unordered_map<FeatureStoreKey, FeatureStoreValue, FeatureStoreKeyHash>
+      data_;
+};
+
+class InMemoryFeatureEngine : public FeatureEngine {
+ public:
+  [[nodiscard]] auto create_builder()
+      -> std::unique_ptr<FeatureStoreBuilder> override {
+    return std::make_unique<InMemoryFeatureStoreBuilder>();
+  }
+
+  [[nodiscard]] auto name() const -> std::string_view override { return name_; }
+
+ private:
+  static constexpr std::string_view name_ = "InMemoryFeatureEngine";
 };
 
 struct Config {
@@ -86,9 +176,9 @@ class OldFeatureStore {
       -> std::span<const float> = 0;
 };
 
-class InMemoryFeatureStore final : public OldFeatureStore {
+class InMemoryOldFeatureStore final : public OldFeatureStore {
  public:
-  explicit InMemoryFeatureStore(std::vector<std::vector<float>> data)
+  explicit InMemoryOldFeatureStore(std::vector<std::vector<float>> data)
       : data_(std::move(data)),
         num_nodes_(data_.size()),
         feature_dim_(data_.empty() ? 0 : data_[0].size()) {}
@@ -142,12 +232,12 @@ inline auto write_file(const std::string &db_path,
   }
 }
 
-inline auto read_file(const std::string &db_path) -> InMemoryFeatureStore {
+inline auto read_file(const std::string &db_path) -> InMemoryOldFeatureStore {
   std::cout << "Reading graph at db_path: " << db_path << std::endl;
   std::ifstream in_file(db_path, std::ios::binary);
   if (!in_file) {
     std::cerr << "Error opening file: " << db_path << std::endl;
-    return InMemoryFeatureStore({});
+    return InMemoryOldFeatureStore({});
   }
 
   std::size_t num_nodes = 0;
@@ -157,7 +247,7 @@ inline auto read_file(const std::string &db_path) -> InMemoryFeatureStore {
 
   if (num_nodes == 0 || feature_dim == 0) {
     std::cerr << "Got empty node features\n";
-    return InMemoryFeatureStore({});
+    return InMemoryOldFeatureStore({});
   }
 
   std::vector<std::vector<float>> features(num_nodes,
@@ -166,7 +256,7 @@ inline auto read_file(const std::string &db_path) -> InMemoryFeatureStore {
     in_file.read(reinterpret_cast<char *>(features[i].data()),
                  feature_dim * sizeof(float));
   }
-  return InMemoryFeatureStore(features);
+  return InMemoryOldFeatureStore(features);
 }
 
 }  // namespace detail
