@@ -1,25 +1,22 @@
-#include <iostream>
 #include <string>
 
 #include "config.h"
 #include "engines/engines.h"
-#include "timer.h"
+#include "runner.h"
+
+constexpr std::string dataset_name = "ogbn-arxiv";
+constexpr std::string run_id = "run-0001";
 
 auto main() -> int {
   using ggb::bench::RunConfig;
-  using ggb::bench::perf::ScopedTimer;
-  {
-    const ScopedTimer timer{};
+  using ggb::bench::Runner;
+
+  auto cfg = RunConfig::load(dataset_name, run_id);
+  if (!cfg) {
+    return 1;
   }
-  {
-    const ScopedTimer timer{"Foo"};
-  }
 
-  const auto store = ggb::engine::create_in_memory_builder()->build();
-  std::cout << store->name() << std::endl;
-
-  constexpr std::string dataset_name = "ogbn-arxiv";
-  constexpr std::string run_id = "run-0001";
-
-  auto cfg = RunConfig::load_from_run(dataset_name, run_id);
+  Runner runner(ggb::engine::create_in_memory_builder(), cfg.value());
+  auto results = runner.run();
+  return 0;
 }
