@@ -1,5 +1,5 @@
 #pragma once
 
-namespace ggb::perf {
+namespace ggb::bench::perf {
 class BenchResult {};
-}  // namespace ggb::perf
+}  // namespace ggb::bench::perf

@@ -8,7 +8,7 @@
 #include <string>
 #include <utility>
 
-namespace ggb::perf {
+namespace ggb::bench::perf {
 
 class ScopedTimer {
  public:
@@ -42,4 +42,4 @@ class ScopedTimer {
   Callback cb_;
   std::chrono::time_point<std::chrono::high_resolution_clock> start_;
 };
-}  // namespace ggb::perf
+}  // namespace ggb::bench::perf
