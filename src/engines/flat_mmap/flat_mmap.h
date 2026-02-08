@@ -14,14 +14,14 @@
 
 namespace ggb::engine {
 
-class GGBFeatureStore final : public FeatureStore {
+class FlatMmapFeatureStore final : public FeatureStore {
  public:
-  explicit GGBFeatureStore(
-      GGBConfig cfg,
+  explicit FlatMmapFeatureStore(
+      FlatMmapConfig cfg,
       std::unordered_map<Key, std::size_t, KeyHash>&& key_to_byte,
       std::optional<std::size_t> tensor_size);
 
-  ~GGBFeatureStore() override;
+  ~FlatMmapFeatureStore() override;
 
   [[nodiscard]] auto name() const -> std::string_view override;
   [[nodiscard]] auto get_num_keys() const -> std::size_t override;
@@ -31,8 +31,8 @@ class GGBFeatureStore final : public FeatureStore {
       -> std::future<std::vector<std::optional<Value>>> override;
 
  private:
-  static constexpr std::string_view name_ = "GGBFeatureStore";
-  const GGBConfig cfg_;
+  static constexpr std::string_view name_ = "FlatMmapFeatureStore";
+  const FlatMmapConfig cfg_;
   const std::unordered_map<Key, std::size_t, KeyHash> key_to_byte_;
   const std::optional<std::size_t> tensor_size_;
 
@@ -43,9 +43,9 @@ class GGBFeatureStore final : public FeatureStore {
   void cleanup_mmap();
 };
 
-class GGBFeatureStoreBuilder final : public FeatureStoreBuilder {
+class FlatMmapFeatureStoreBuilder final : public FeatureStoreBuilder {
  public:
-  explicit GGBFeatureStoreBuilder(const GGBConfig& cfg);
+  explicit FlatMmapFeatureStoreBuilder(const FlatMmapConfig& cfg);
 
   auto put_tensor(const Key& key, const Value& tensor) -> bool override;
   auto put_tensor(const Key& key, Value&& tensor) -> bool override;
@@ -54,7 +54,7 @@ class GGBFeatureStoreBuilder final : public FeatureStoreBuilder {
       -> std::unique_ptr<FeatureStore> override;
 
  private:
-  const GGBConfig cfg_;
+  const FlatMmapConfig cfg_;
   std::ofstream out_file_;
   std::unordered_map<Key, std::size_t, KeyHash> key_to_byte_;
   std::optional<std::size_t> tensor_size_;

@@ -63,7 +63,8 @@ auto test_with_builder(std::unique_ptr<ggb::FeatureStoreBuilder> builder)
 }  // namespace
 
 auto main() -> int {
-  test_with_builder(ggb::create_builder(ggb::GGBConfig{.db_path = db_path}));
+  test_with_builder(
+      ggb::create_builder(ggb::FlatMmapConfig{.db_path = db_path}));
   test_with_builder(ggb::create_builder(ggb::InMemoryConfig{}));
   return 0;
 }

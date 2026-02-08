@@ -15,13 +15,13 @@
 
 namespace ggb {
 
-struct GGBConfig {
+struct FlatMmapConfig {
   std::string db_path;
 };
 
 struct InMemoryConfig {};
 
-using EngineConfig = std::variant<GGBConfig, InMemoryConfig>;
+using EngineConfig = std::variant<FlatMmapConfig, InMemoryConfig>;
 
 using NodeID = std::uint64_t;
 using Value = std::vector<float>;

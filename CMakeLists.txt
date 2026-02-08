@@ -14,7 +14,7 @@ add_compile_options(-Wall -Wextra -pedantic)
 
 add_library(${PROJECT_NAME} SHARED
     src/engine_factory.cpp
-    src/engines/ggb/ggb.cpp
+    src/engines/flat_mmap/flat_mmap.cpp
     src/engines/in_memory/in_memory.cpp
 )
 
