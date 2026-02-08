@@ -6,10 +6,11 @@
 #include <cstdint>
 #include <format>
 #include <functional>
-#include <iostream>
 #include <numeric>
+#include <sstream>
 #include <vector>
 
+#include "common/logging.h"
 #include "config.h"
 
 namespace ggb::bench::perf {
@@ -27,20 +28,20 @@ struct BenchResult {
   std::size_t num_tensors_read_{0};
 
   auto print() -> void {
-    std::cout << std::format(
+    GGB_LOG_INFO(
         "Results for {}, run_id: {}, batch_size: {}, num_hops: {}, fan_out: "
-        "{}\n",
+        "{}",
         cfg.dataset_name, cfg.run_id, cfg.sampling.batch_size,
         cfg.sampling.num_hops, cfg.sampling.fan_out);
 
     if (latencies_us_.empty()) {
-      std::cerr << "Error: No latencies found\n";
+      GGB_LOG_WARN("No latencies found");
       return;
     }
 
     std::ranges::sort(latencies_us_);
 
-    const size_t n = latencies_us_.size();
+    const auto n = latencies_us_.size();
     const double sum =
         std::accumulate(latencies_us_.begin(), latencies_us_.end(), 0.0);
     const double mean = sum / n;
@@ -56,26 +57,25 @@ struct BenchResult {
       return val_us / 1000.0;  // Convert to ms
     };
 
-    std::cout << "----------------------------------------------------------\n";
-    std::cout << std::format("{:<15} : {}\n", "Total Queries", n);
-    std::cout << std::format("{:<15} : {}\n", "Total Tensors",
-                             num_tensors_read_);
-    std::cout << std::format("{:<15} : {:.3f} ms\n", "Mean Latency",
-                             mean / 1000.0);
-    std::cout << std::format("{:<15} : {:.3f} ms\n", "Std Deviation",
-                             std_dev / 1000.0);
-    std::cout << "----------------------------------------------------------\n";
-    std::cout << std::format(
-        "{:<15} : {:.3f} ms\n", "Min",
-        static_cast<double>(latencies_us_.front()) / 1000.0);
-    std::cout << std::format("{:<15} : {:.3f} ms\n", "P50", get_p_ms(50));
-    std::cout << std::format("{:<15} : {:.3f} ms\n", "P90", get_p_ms(90));
-    std::cout << std::format("{:<15} : {:.3f} ms\n", "P95", get_p_ms(95));
-    std::cout << std::format("{:<15} : {:.3f} ms\n", "P99", get_p_ms(99));
-    std::cout << std::format(
-        "{:<15} : {:.3f} ms\n", "Max",
-        static_cast<double>(latencies_us_.back()) / 1000.0);
-    std::cout << "----------------------------------------------------------\n";
+    std::ostringstream oss;
+    oss << "\n----------------------- Benchmark ------------------------\n"
+        << std::format("{:<15} : {}\n", "Total Queries", n)
+        << std::format("{:<15} : {}\n", "Total Tensors", num_tensors_read_)
+        << std::format("{:<15} : {:.3f} ms\n", "Mean Latency", mean / 1000.0)
+        << std::format("{:<15} : {:.3f} ms\n", "Std Deviation",
+                       std_dev / 1000.0)
+        << "----------------------------------------------------------\n"
+        << std::format("{:<15} : {:.3f} ms\n", "Min",
+                       static_cast<double>(latencies_us_.front()) / 1000.0)
+        << std::format("{:<15} : {:.3f} ms\n", "P50", get_p_ms(50))
+        << std::format("{:<15} : {:.3f} ms\n", "P90", get_p_ms(90))
+        << std::format("{:<15} : {:.3f} ms\n", "P95", get_p_ms(95))
+        << std::format("{:<15} : {:.3f} ms\n", "P99", get_p_ms(99))
+        << std::format("{:<15} : {:.3f} ms\n", "Max",
+                       static_cast<double>(latencies_us_.back()) / 1000.0)
+        << "----------------------------------------------------------";
+
+    GGB_LOG_INFO("{}", oss.str());
   }
 };
 
