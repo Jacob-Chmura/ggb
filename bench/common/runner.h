@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <cstdint>
 #include <cstdlib>
@@ -17,7 +18,7 @@
 #include <vector>
 
 #include "config.h"
-#include "ggb.h"
+#include "ggb/core.h"
 #include "queries.h"
 #include "result.h"
 #include "timer.h"
@@ -29,7 +30,7 @@ class Runner {
       : builder_(std::move(builder)), cfg_(std::move(cfg)) {}
 
   auto run() -> perf::BenchResult {
-    perf::BenchResult result{.cfg = cfg_};
+    perf::BenchResult result{.cfg = cfg_, .latencies_us_{}};
 
     {
       const perf::ScopedTimer timer("Ingestion");

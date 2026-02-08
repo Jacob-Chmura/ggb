@@ -1,7 +1,8 @@
 #include <string>
+#include <utility>
 
 #include "config.h"
-#include "engines/engines.h"
+#include "ggb/core.h"
 #include "runner.h"
 
 constexpr std::string dataset_name = "ogbn-arxiv";
@@ -16,7 +17,9 @@ auto main() -> int {
     return 1;
   }
 
-  Runner runner(ggb::engine::create_in_memory_builder(), cfg.value());
+  auto builder = ggb::create_builder(ggb::InMemoryConfig{});
+
+  Runner runner(std::move(builder), cfg.value());
   auto results = runner.run();
   results.print();
   return 0;
