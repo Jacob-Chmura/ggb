@@ -9,6 +9,8 @@
 #include <string_view>
 #include <utility>
 
+#include "common/logging.h"
+
 namespace ggb::bench::perf {
 
 class ScopedTimer {
@@ -22,8 +24,7 @@ class ScopedTimer {
       : start_(std::chrono::high_resolution_clock::now()) {
     const std::string op_name_str{op_name};
     cb_ = [op_name_str](std::uint64_t us) {
-      std::cout << std::format("[TIMER] {}: {} ms\n", op_name_str,
-                               static_cast<double>(us) / 1000.0);
+      GGB_LOG_INFO("{}: {} ms", op_name_str, static_cast<double>(us) / 1000.0);
     };
   }
 
@@ -34,7 +35,7 @@ class ScopedTimer {
     try {
       cb_(duration.count());
     } catch (...) {
-      std::cerr << "Exception occured during ScopedTimer callback execution";
+      GGB_LOG_ERROR("Exception occured during ScopedTimer callback execution");
     }
   }
 

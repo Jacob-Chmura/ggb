@@ -3,11 +3,15 @@
 #define PROJECT_ROOT "."  // Fallback
 #endif
 
+#include <algorithm>
 #include <cstddef>
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <vector>
+
+#include "common/logging.h"
 
 namespace ggb::bench {
 namespace fs = std::filesystem;
@@ -35,8 +39,7 @@ struct RunConfig {
       -> std::optional<RunConfig> {
     const auto dataset_dir = get_dataset_dir(dataset_name);
     if (!fs::is_directory(dataset_dir)) {
-      std::cerr << std::format("Error: Dataset directory not found: {}\n",
-                               dataset_dir.string());
+      GGB_LOG_ERROR("Dataset directory not found: {}", dataset_dir.string());
       return std::nullopt;
     }
 
@@ -47,19 +50,19 @@ struct RunConfig {
     cfg.edge_list_path = dataset_dir / edge_list_file_name;
 
     if (!fs::exists(cfg.node_feat_path)) {
-      std::cerr << "Error: Node feature file does not exists: "
-                << cfg.node_feat_path << "\n";
+      GGB_LOG_ERROR("Feature file not found: {}", cfg.node_feat_path.string());
       return std::nullopt;
     }
     if (!fs::exists(cfg.edge_list_path)) {
-      std::cerr << "Error: Edge list file does not exists: "
-                << cfg.edge_list_path << "\n";
+      GGB_LOG_ERROR("Edgelist file not found: {}", cfg.edge_list_path.string());
       return std::nullopt;
     }
 
     const auto run_dir = dataset_dir / "queries" / run_id;
     if (!fs::is_directory(run_dir)) {
       std::cerr << "Error: Run directory does not exist: " << run_dir << "\n";
+      GGB_LOG_ERROR("Run directory: {} is not a valid directory",
+                    run_dir.string());
       return std::nullopt;
     }
 
@@ -69,7 +72,8 @@ struct RunConfig {
       }
     }
     if (cfg.query_csvs.empty()) {
-      std::cerr << "Error: No query CSVs found in " << run_dir << "\n";
+      GGB_LOG_ERROR("No query CSVs found in run directory: {}",
+                    run_dir.string());
       return std::nullopt;
     }
     std::ranges::sort(cfg.query_csvs);  // Sort so queries run in seeded order
@@ -77,6 +81,7 @@ struct RunConfig {
     // TODO(kuba): json parsing
     cfg.sampling = {
         .seed = 1337, .batch_size = 1024, .num_hops = 2, .fan_out = 10};
+    GGB_LOG_WARN("JSON parsing not implemented, using dummy values for now");
     return cfg;
   }
 

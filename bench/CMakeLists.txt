@@ -6,5 +6,12 @@ target_include_directories(bench_main PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/common
 )
+target_include_directories(bench_main PRIVATE
+    # 1. Look in 'src' so #include "common/logging.h" works
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+
+    # 2. Look in project root so #include "bench/common/xxx.h" works
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
 
 add_definitions(-DBENCHMARKS_ROOT="${CMAKE_SOURCE_DIR}")

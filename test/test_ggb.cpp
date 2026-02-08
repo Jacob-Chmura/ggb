@@ -3,10 +3,12 @@
 #include <iostream>
 #include <optional>
 #include <random>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "common/logging.h"
 #include "ggb/core.h"
 
 constexpr std::string db_path = "test.ggb";
@@ -15,16 +17,19 @@ const std::size_t feature_dim = 3;
 
 namespace {
 void print_feature_row(ggb::Key key, const std::optional<ggb::Value>& feat) {
-  std::cout << "Node: " << key << " | Feat: ";
   if (!feat.has_value()) {
-    std::cout << "[Not Found]\n";
+    GGB_LOG_WARN("Node: {} | Feat: [Not Found]", key.NodeID);
     return;
   }
-  std::cout << "[";
+
+  std::ostringstream oss;
+  oss << "[";
   for (std::size_t i = 0; i < feat->size(); ++i) {
-    std::cout << (*feat)[i] << (i == feat->size() - 1 ? "" : ", ");
+    oss << (*feat)[i] << (i == feat->size() - 1 ? "" : ", ");
   }
-  std::cout << "]\n";
+  oss << "]";
+
+  GGB_LOG_INFO("Node: {} | Feat: {}", key.NodeID, oss.str());
 }
 
 void ingest_data(ggb::FeatureStoreBuilder& builder) {
@@ -32,7 +37,7 @@ void ingest_data(ggb::FeatureStoreBuilder& builder) {
   std::mt19937 engine(rng());
   std::uniform_real_distribution<float> dist(0.0F, 1.0F);
 
-  std::cout << "---------- INGESTING FEATURES ---------\n";
+  GGB_LOG_INFO("---------- INGESTING FEATURES ---------");
   for (std::size_t i = 0; i < num_nodes; ++i) {
     ggb::Value tensor(feature_dim);
     for (auto& val : tensor) {
@@ -55,7 +60,7 @@ auto test_with_builder(std::unique_ptr<ggb::FeatureStoreBuilder> builder)
   };
   auto results = store->get_multi_tensor(query_keys);
 
-  std::cout << "\n------------ GATHER RESULTS -----------\n";
+  GGB_LOG_INFO("---------- GATHER RESULTS ---------");
   for (std::size_t i = 0; i < query_keys.size(); ++i) {
     print_feature_row(query_keys[i], results[i]);
   }

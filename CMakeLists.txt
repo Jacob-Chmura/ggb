@@ -29,6 +29,7 @@ target_include_directories(${PROJECT_NAME}
 
 add_executable(test_ggb test/test_ggb.cpp)
 target_link_libraries(test_ggb PRIVATE ${PROJECT_NAME})
+target_include_directories(test_ggb PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 if (GGB_BUILD_BENCHMARKS)
     add_subdirectory(bench)
