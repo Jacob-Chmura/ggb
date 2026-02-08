@@ -6,6 +6,7 @@
 #include <functional>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace ggb::bench::perf {
@@ -19,9 +20,10 @@ class ScopedTimer {
 
   explicit ScopedTimer(std::string_view op_name = "Operation")
       : start_(std::chrono::high_resolution_clock::now()) {
-    std::string op_name_str{op_name};
+    const std::string op_name_str{op_name};
     cb_ = [op_name_str](std::uint64_t us) {
-      std::cout << std::format("[TIMER] {}: {} us\n", op_name_str, us);
+      std::cout << std::format("[TIMER] {}: {} ms\n", op_name_str,
+                               static_cast<double>(us) / 1000.0);
     };
   }
 
@@ -29,7 +31,11 @@ class ScopedTimer {
     auto end = std::chrono::high_resolution_clock::now();
     auto duration =
         std::chrono::duration_cast<std::chrono::microseconds>(end - start_);
-    cb_(duration.count());
+    try {
+      cb_(duration.count());
+    } catch (...) {
+      std::cerr << "Exception occured during ScopedTimer callback execution";
+    }
   }
 
   ScopedTimer(const ScopedTimer&) = delete;

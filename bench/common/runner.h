@@ -2,6 +2,7 @@
 
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 
 #include <cstdint>
 #include <cstdlib>
@@ -9,6 +10,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -16,6 +18,7 @@
 
 #include "config.h"
 #include "ggb.h"
+#include "queries.h"
 #include "result.h"
 #include "timer.h"
 
@@ -26,7 +29,7 @@ class Runner {
       : builder_(std::move(builder)), cfg_(std::move(cfg)) {}
 
   auto run() -> perf::BenchResult {
-    perf::BenchResult result{};
+    perf::BenchResult result{.cfg = cfg_};
 
     {
       const perf::ScopedTimer timer("Ingestion");
@@ -44,7 +47,6 @@ class Runner {
     edge_buffer_.shrink_to_fit();
 
     {
-      const perf::ScopedTimer timer("Inference");
       run_queries(result);
     }
 
@@ -146,28 +148,20 @@ class Runner {
 
   auto run_queries(perf::BenchResult& result) -> void {
     for (const auto& query_csv : cfg_.query_csvs) {
-      std::ifstream file(query_csv);
-      if (!file.is_open()) {
-        throw std::runtime_error("Failed to query file: " + query_csv.string());
-      }
+      const auto queries = QueryLoader::from_csv(query_csv.string());
 
-      std::string line;
-      while (std::getline(file, line)) {
-        std::stringstream ss(line);
-        std::string part;
-        std::vector<ggb::Key> keys;
-
-        while (std::getline(ss, part, ',')) {
-          keys.push_back(ggb::Key{.NodeID = std::stoull(part)});
-        }
-
+      for (const auto& query : queries) {
         {
           const perf::ScopedTimer timer(
               [&](std::uint64_t us) { result.latencies_us_.push_back(us); });
-          auto feats = store_->get_multi_tensor(std::span(keys));
+          auto feats = store_->get_multi_tensor(std::span(query));
         }
-        result.num_tensors_read_ += keys.size();
+
+        result.num_tensors_read_ += query.size();
       }
+
+      // TODO(kuba): more metrics and properties across seeds
+      break;
     }
   }
 };

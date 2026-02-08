@@ -13,6 +13,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -115,6 +116,7 @@ class GGBFeatureStore final : public FeatureStore {
     for (const auto &key : keys) {
       if (auto it = key_to_byte_.find(key); it != key_to_byte_.end()) {
         const float *start = mapped_data_ + (it->second / sizeof(float));
+        // TODO(kuba): short-circuit empty tensors
         results.emplace_back(Value(start, start + *tensor_size_));
       } else {
         results.emplace_back(std::nullopt);

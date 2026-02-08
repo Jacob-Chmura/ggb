@@ -12,6 +12,7 @@
 namespace ggb::bench {
 namespace fs = std::filesystem;
 
+// TODO(kuba): the engines themselves have configs
 struct RunConfig {
   struct SamplingParams {
     int seed{0};

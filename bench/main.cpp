@@ -1,5 +1,3 @@
-#include <format>
-#include <iostream>
 #include <string>
 
 #include "config.h"
@@ -20,8 +18,6 @@ auto main() -> int {
 
   Runner runner(ggb::engine::create_in_memory_builder(), cfg.value());
   auto results = runner.run();
-  std::cout << std::format("Number of tensors read: {}",
-                           results.num_tensors_read_)
-            << std::endl;
+  results.print();
   return 0;
 }
