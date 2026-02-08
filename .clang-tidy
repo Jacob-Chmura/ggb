@@ -14,6 +14,8 @@ Checks: >
 WarningsAsErrors: ""
 
 CheckOptions:
+  - key: readability-identifier-length.MinimumIdentifierLength
+    value: 2
   - key: readability-identifier-naming.ClassCase
     value: CamelCase
   - key: readability-identifier-naming.FunctionCase
