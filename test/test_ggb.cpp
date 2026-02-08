@@ -1,5 +1,7 @@
 #include <cstddef>
+#include <cstdint>
 #include <iostream>
+#include <optional>
 #include <random>
 #include <string>
 #include <utility>
@@ -37,7 +39,7 @@ void ingest_data(ggb::FeatureStoreBuilder& builder) {
       val = dist(engine);
     }
 
-    ggb::Key key{static_cast<std::uint64_t>(i)};
+    const ggb::Key key{static_cast<std::uint64_t>(i)};
     print_feature_row(key, tensor);
     builder.put_tensor(key, std::move(tensor));
   }

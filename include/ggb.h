@@ -3,7 +3,6 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 #include <cstddef>
@@ -151,9 +150,13 @@ class GGBFeatureStore final : public FeatureStore {
     struct stat st;
     fstat(fd, &st);
     file_size_ = st.st_size;
+
     mapped_data_ = static_cast<const float *>(
         mmap(nullptr, file_size_, PROT_READ, MAP_SHARED, fd, 0));
     close(fd);
+    if (mapped_data_ == MAP_FAILED) {
+      throw std::runtime_error("mmap failed");
+    }
   }
 };
 
