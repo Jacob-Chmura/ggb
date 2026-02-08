@@ -1,5 +1,4 @@
 #include <string>
-#include <utility>
 
 #include "config.h"
 #include "ggb/core.h"
@@ -17,10 +16,19 @@ auto main() -> int {
     return 1;
   }
 
-  auto builder = ggb::create_builder(ggb::InMemoryConfig{});
+  {
+    Runner runner(ggb::create_builder(ggb::InMemoryConfig{}), cfg.value());
+    auto results = runner.run();
+    results.print();
+  }
 
-  Runner runner(std::move(builder), cfg.value());
-  auto results = runner.run();
-  results.print();
+  {
+    Runner runner(
+        ggb::create_builder(ggb::FlatMmapConfig{.db_path = "test.ggb"}),
+        cfg.value());
+    auto results = runner.run();
+    results.print();
+  }
+
   return 0;
 }

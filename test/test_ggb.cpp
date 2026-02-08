@@ -15,7 +15,7 @@ const std::size_t feature_dim = 3;
 
 namespace {
 void print_feature_row(ggb::Key key, const std::optional<ggb::Value>& feat) {
-  std::cout << "Node: " << key.NodeID << " | Feat: ";
+  std::cout << "Node: " << key << " | Feat: ";
   if (!feat.has_value()) {
     std::cout << "[Not Found]\n";
     return;
