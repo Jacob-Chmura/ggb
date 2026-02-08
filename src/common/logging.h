@@ -19,15 +19,16 @@ inline void log_impl(LogLevel level, std::string_view file, int line,
   std::string_view prefix;
   auto show_trigger_loc = true;
   switch (level) {
-    case LogLevel::INFO:
-      prefix = "[INFO]";
-      show_trigger_loc = false;
-      break;
     case LogLevel::WARN:
       prefix = "[WARN]";
       break;
     case LogLevel::ERROR:
       prefix = "[ERR ]";
+      break;
+    case LogLevel::INFO:
+    default:  // Default to INFO
+      prefix = "[INFO]";
+      show_trigger_loc = false;
       break;
   }
 
