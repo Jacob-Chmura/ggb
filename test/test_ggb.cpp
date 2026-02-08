@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "ggb.h"
+#include "ggb/core.h"
 
 constexpr std::string db_path = "test.ggb";
 const std::size_t num_nodes = 5;
@@ -21,8 +21,8 @@ void print_feature_row(ggb::Key key, const std::optional<ggb::Value>& feat) {
     return;
   }
   std::cout << "[";
-  for (auto val : feat.value()) {
-    std::cout << val << (val == feat->back() ? "" : ", ");
+  for (std::size_t i = 0; i < feat->size(); ++i) {
+    std::cout << (*feat)[i] << (i == feat->size() - 1 ? "" : ", ");
   }
   std::cout << "]\n";
 }
@@ -44,23 +44,27 @@ void ingest_data(ggb::FeatureStoreBuilder& builder) {
     builder.put_tensor(key, std::move(tensor));
   }
 }
-}  // namespace
 
-auto main() -> int {
-  auto builder = ggb::engine::create_ggb_builder({.db_path = db_path});
+auto test_with_builder(std::unique_ptr<ggb::FeatureStoreBuilder> builder)
+    -> void {
   ingest_data(*builder);
-  std::cout << "\nFinalizing Store (Building flat file)...\n";
   auto store = builder->build();
 
-  std::cout << "\n------------ GATHER RESULTS -----------\n";
   std::vector<ggb::Key> query_keys = {
       {0}, {1}, {3}, {99}  // 99 tests the 'nullopt' case
   };
-
   auto results = store->get_multi_tensor(query_keys);
+
+  std::cout << "\n------------ GATHER RESULTS -----------\n";
   for (std::size_t i = 0; i < query_keys.size(); ++i) {
     print_feature_row(query_keys[i], results[i]);
   }
+}
+}  // namespace
 
+auto main() -> int {
+  test_with_builder(
+      ggb::create_builder(ggb::FlatMmapConfig{.db_path = db_path}));
+  test_with_builder(ggb::create_builder(ggb::InMemoryConfig{}));
   return 0;
 }

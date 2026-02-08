@@ -1,10 +1,12 @@
 #pragma once
 
+#include <fstream>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
-#include "ggb.h"
+#include "ggb/core.h"
 
 namespace ggb::bench {
 
