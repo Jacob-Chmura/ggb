@@ -76,17 +76,54 @@ jobs:
         run: |
           ./scripts/ggb_build.sh ${{ matrix.build_type }}
 
-      - name: Set up python
-        id: setup-python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version-file: "bench/query_gen/.python-version"
+          enable-cache: true
 
-      - name: Install uv
-        shell: bash
-        run: curl -LsSf https://astral.sh/uv/${{ env.UV_VERSION }}/install.sh | sh
+      - name: Set up Python
+        run: uv python install $(cat bench/query_gen/.python-version)
 
       - name: Build Benchmarks Python Env
         shell: bash
         run: |
           ./scripts/bench_setup_python.sh
+
+  python-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install $(cat bench/query_gen/.python-version)
+
+      - name: "Run Ruff Linting"
+        uses: astral-sh/ruff-action@v1
+        with:
+          changed-files: "true"
+
+  python-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install $(cat bench/query_gen/.python-version)
+
+      - name: "Run Ruff Formatter"
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "format --check"
+          version-file: "pyproject.toml"
