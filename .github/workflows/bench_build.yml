@@ -31,6 +31,16 @@ jobs:
         run: |
           ./scripts/ggb_build.sh ${{ matrix.build_type }}
 
+      - name: Set up python
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install uv
+        shell: bash
+        run: curl -LsSf https://astral.sh/uv/${{ env.UV_VERSION }}/install.sh | sh
+
       - name: Build Benchmarks Python Env
         shell: bash
         run: |
