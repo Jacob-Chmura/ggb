@@ -156,3 +156,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Run clang-format check
+        run: |
+          # Find all source files and check formatting
+          # --dry-run returns a non-zero exit code if formatting is needed
+          # -Werror makes it fail the job
+          find src include test -name '*.cpp' -o -name '*.h' | xargs clang-format --dry-run -Werror
