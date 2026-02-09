@@ -4,7 +4,9 @@
 #endif
 
 #include <cstddef>
+#include <exception>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -12,11 +14,16 @@
 
 #include "common/logging.h"
 
+// Third-party
+#include <nlohmann/json.hpp>
+
 namespace ggb::bench {
 namespace fs = std::filesystem;
 
 // TODO(kuba): the engines themselves have configs
 struct RunConfig {
+  using json = nlohmann::json;
+
   struct SamplingParams {
     int seed{0};
     std::size_t batch_size{0};
@@ -85,10 +92,35 @@ struct RunConfig {
       return std::nullopt;
     }
 
-    // TODO(kuba): json parsing
-    cfg.sampling = {
-        .seed = 1337, .batch_size = 1024, .num_hops = 2, .fan_out = 10};
-    GGB_LOG_WARN("JSON parsing not implemented, using dummy values for now");
+    const auto metadata_path = run_dir / "metadata.json";
+    if (!fs::exists(metadata_path)) {
+      GGB_LOG_ERROR("Metadata JSON not found in: {}", metadata_path.string());
+      return std::nullopt;
+    }
+
+    try {
+      std::ifstream f(metadata_path);
+      if (!f.is_open()) {
+        GGB_LOG_ERROR("Could not open Metadata JSON: {}",
+                      metadata_path.string());
+        return std::nullopt;
+      }
+
+      json data = json::parse(f);
+      cfg.sampling.seed = data.at("seed").get<int>();
+      cfg.sampling.batch_size = data.at("batch_size").get<std::size_t>();
+      cfg.sampling.num_hops = data.at("num_hops").get<std::size_t>();
+      cfg.sampling.fan_out = data.at("fan_out").get<std::size_t>();
+
+    } catch (const json::parse_error& e) {
+      GGB_LOG_ERROR("JSON Parse Error in {}: {}", metadata_path.string(),
+                    e.what());
+      return std::nullopt;
+    } catch (const std::exception& e) {
+      GGB_LOG_ERROR("Unexpected error loading metadata: {}", e.what());
+      return std::nullopt;
+    }
+
     return cfg;
   }
 
