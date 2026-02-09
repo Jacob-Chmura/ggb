@@ -31,7 +31,6 @@ inline auto ingest_features_from_csv(const std::string& path,
     tensor.clear();
     char* next_ptr = nullptr;
 
-    // Inner loop: parse floats until we hit a newline
     while (ptr < end && *ptr != '\n' && *ptr != '\r') {
       const float val = std::strtof(ptr, &next_ptr);
       if (ptr == next_ptr) {
@@ -51,7 +50,6 @@ inline auto ingest_features_from_csv(const std::string& path,
       builder.put_tensor({node_id++}, tensor);
     }
 
-    // Advance to the start of the next line
     while (ptr < end && (*ptr == '\n' || *ptr == '\r')) {
       ptr++;
     }
