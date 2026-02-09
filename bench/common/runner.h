@@ -148,21 +148,15 @@ class Runner {
   }
 
   auto run_queries(perf::BenchResult& result) -> void {
-    for (const auto& query_csv : cfg_.query_csvs) {
-      const auto queries = QueryLoader::from_csv(query_csv.string());
-
-      for (const auto& query : queries) {
-        {
-          const perf::ScopedTimer timer(
-              [&](std::uint64_t us) { result.latencies_us_.push_back(us); });
-          auto feats = store_->get_multi_tensor(std::span(query));
-        }
-
-        result.num_tensors_read_ += query.size();
+    const auto queries = QueryLoader::from_csv(cfg_.query_csv_path.string());
+    for (const auto& query : queries) {
+      {
+        const perf::ScopedTimer timer(
+            [&](std::uint64_t us) { result.latencies_us_.push_back(us); });
+        auto feats = store_->get_multi_tensor(std::span(query));
       }
 
-      // TODO(kuba): more metrics and properties across seeds
-      break;
+      result.num_tensors_read_ += query.size();
     }
   }
 };

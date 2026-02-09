@@ -14,7 +14,7 @@ print_usage() {
     echo "All arguments are forwarded to bench/query_gen/__main__.py."
     echo
     echo "Example:"
-    echo "  $0 --dataset-name ogbn-arxiv --rounds 5 --batch_size 512"
+    echo "  $0 --dataset-name ogbn-arxiv --batch-size 512 --num-hops 2 --fan-out 10"
     echo
     echo "Environment:"
     echo "  - Checks for 'uv' installation."
