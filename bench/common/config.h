@@ -8,6 +8,7 @@
 #include <iostream>
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include "common/logging.h"
 
@@ -83,8 +84,6 @@ struct RunConfig {
                     run_dir.string());
       return std::nullopt;
     }
-    GGB_LOG_INFO("Using query file: {}",
-                 cfg.query_csv_path.filename().string());
 
     // TODO(kuba): json parsing
     cfg.sampling = {

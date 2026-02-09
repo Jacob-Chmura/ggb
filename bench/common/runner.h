@@ -1,21 +1,16 @@
 #pragma once
 
-#include <sys/mman.h>
-
 #include <cstdint>
 #include <cstdlib>
-#include <fstream>
 #include <memory>
 #include <optional>
 #include <span>
-#include <sstream>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "common/io.h"
 #include "common/logging.h"
-#include "common/mmap_region.h"
 #include "config.h"
 #include "ggb/core.h"
 #include "queries.h"
@@ -35,8 +30,10 @@ class Runner {
     {
       const perf::ScopedTimer timer("Ingestion");
       GGB_LOG_INFO("Ingesting features and graph topology");
-      ingest_features();
-      ingest_graph();
+      ggb::io::ingest_features_from_csv(cfg_.node_feat_path, *builder_);
+      ggb::io::ingest_edgelist_from_csv(cfg_.edge_list_path.string(),
+                                        edge_buffer_);
+      graph_ = ggb::GraphTopology{.edges = std::span(edge_buffer_)};
     }
 
     {
@@ -63,81 +60,6 @@ class Runner {
   RunConfig cfg_{};
   std::optional<ggb::GraphTopology> graph_;
   std::vector<std::pair<ggb::NodeID, ggb::NodeID>> edge_buffer_;
-
-  auto ingest_graph() -> void {
-    std::ifstream file(cfg_.edge_list_path);
-    if (!file.is_open()) {
-      GGB_LOG_ERROR("Failed to open file: {}", cfg_.edge_list_path.string());
-      throw std::runtime_error("Failed to open edge list: " +
-                               cfg_.edge_list_path.string());
-    }
-
-    std::string line;
-    while (std::getline(file, line)) {
-      std::stringstream ss(line);
-      std::string part;
-      std::vector<ggb::NodeID> nodes;
-
-      while (std::getline(ss, part, ',')) {
-        nodes.push_back(std::stoull(part));
-      }
-
-      if (nodes.size() != 2) {
-        GGB_LOG_ERROR("Malformed edge list: expected 2 nodes per line, got {}",
-                      nodes.size());
-        throw std::runtime_error("Malformed edge list");
-      }
-      edge_buffer_.emplace_back(nodes[0], nodes[1]);
-    }
-    graph_ = ggb::GraphTopology{.edges = std::span(edge_buffer_)};
-  }
-
-  auto ingest_features() -> void {
-    const ggb::detail::MmapRegion mmap(cfg_.node_feat_path.string());
-
-    // Hint to the kernel that we will read this start-to-finish
-    mmap.advise(MADV_SEQUENTIAL);
-
-    const char* ptr = static_cast<const char*>(mmap.data());
-    const char* const end = ptr + mmap.size();
-
-    std::uint64_t node_id{0};
-    ggb::Value tensor;
-    tensor.reserve(128);  // Pre-reserve typical GNN feature dim
-
-    while (ptr < end) {
-      tensor.clear();
-      char* next_ptr = nullptr;
-
-      // Inner loop: parse floats until we hit a newline
-      while (ptr < end && *ptr != '\n' && *ptr != '\r') {
-        const float val = std::strtof(ptr, &next_ptr);
-        if (ptr == next_ptr) {
-          break;  // Could not parse a number
-        }
-
-        tensor.push_back(val);
-        ptr = next_ptr;
-
-        // Skip the comma if present
-        if (ptr < end && *ptr == ',') {
-          ptr++;
-        }
-      }
-
-      if (!tensor.empty()) {
-        builder_->put_tensor({node_id++}, tensor);
-      }
-
-      // Advance to the start of the next line
-      while (ptr < end && (*ptr == '\n' || *ptr == '\r')) {
-        ptr++;
-      }
-    }
-
-    GGB_LOG_INFO("Ingested {} nodes from {}", node_id,
-                 cfg_.node_feat_path.string());
-  }
 
   auto run_queries(perf::BenchResult& result) -> void {
     const auto queries = QueryLoader::from_csv(cfg_.query_csv_path.string());
