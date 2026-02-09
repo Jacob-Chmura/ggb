@@ -69,10 +69,39 @@ class FeatureStoreBuilder {
  public:
   virtual ~FeatureStoreBuilder() = default;
 
-  virtual auto put_tensor(const Key &key, const Value &tensor) -> bool = 0;
-  virtual auto put_tensor(const Key &key, Value &&tensor) -> bool = 0;
-  virtual auto build(std::optional<GraphTopology> graph = std::nullopt)
+  auto put_tensor(const Key &key, const Value &tensor) -> bool {
+    check_not_built();
+    return put_tensor_impl(key, tensor);
+  }
+
+  auto put_tensor(const Key &key, Value &&tensor) -> bool {
+    check_not_built();
+    return put_tensor_impl(key, std::move(tensor));
+  }
+
+  auto build(std::optional<GraphTopology> graph = std::nullopt)
+      -> std::unique_ptr<FeatureStore> {
+    check_not_built();
+    is_built_ = true;
+    return build_impl(graph);
+  }
+
+ protected:
+  virtual auto put_tensor_impl(const Key &key, const Value &tensor) -> bool = 0;
+  virtual auto put_tensor_impl(const Key &key, Value &&tensor) -> bool = 0;
+  virtual auto build_impl(std::optional<GraphTopology> graph = std::nullopt)
       -> std::unique_ptr<FeatureStore> = 0;
+
+ private:
+  auto check_not_built() const -> void {
+    if (is_built_) {
+      throw std::runtime_error(
+          "GGB Error: FeatureStoreBuilder is defunct. After calling `build`, "
+          "futher calls to `put_tensor` or `build` are prohibited.");
+    }
+  }
+
+  bool is_built_{false};
 };
 
 auto create_builder(const EngineConfig &cfg)
