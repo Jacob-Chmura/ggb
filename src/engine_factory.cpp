@@ -2,6 +2,7 @@
 #include <type_traits>
 #include <variant>
 
+#include "common/logging.h"
 #include "engines/flat_mmap/flat_mmap.h"
 #include "engines/in_memory/in_memory.h"
 #include "ggb/core.h"
@@ -15,8 +16,10 @@ auto create_builder(const EngineConfig& cfg)
         using T = std::decay_t<decltype(arg)>;
 
         if constexpr (std::is_same_v<T, FlatMmapConfig>) {
+          GGB_LOG_DEBUG("Creating FlatMmap builder");
           return std::make_unique<engine::FlatMmapFeatureStoreBuilder>(arg);
         } else if constexpr (std::is_same_v<T, InMemoryConfig>) {
+          GGB_LOG_DEBUG("Creating InMemory builder");
           return std::make_unique<engine::InMemoryFeatureStoreBuilder>(arg);
         }
       },

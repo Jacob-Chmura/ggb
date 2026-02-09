@@ -1,17 +1,18 @@
 #include "flat_mmap.h"
 
-#include <fcntl.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 #include <future>
 #include <iostream>
 #include <memory>
-#include <stdexcept>
+#include <optional>
+#include <span>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include "common/logging.h"
 
 namespace ggb::engine {
 
@@ -21,11 +22,10 @@ FlatMmapFeatureStore::FlatMmapFeatureStore(
     std::optional<std::size_t> tensor_size)
     : cfg_(std::move(cfg)),
       key_to_byte_(std::move(key_to_byte)),
-      tensor_size_(tensor_size) {
-  setup_mmap();
+      tensor_size_(tensor_size),
+      mmap_(cfg_.db_path) {
+  mmap_.advise(MADV_RANDOM);  // get some help from the kernel
 }
-
-FlatMmapFeatureStore::~FlatMmapFeatureStore() { cleanup_mmap(); }
 
 [[nodiscard]] auto FlatMmapFeatureStore::name() const -> std::string_view {
   return name_;
@@ -44,46 +44,27 @@ FlatMmapFeatureStore::~FlatMmapFeatureStore() { cleanup_mmap(); }
     std::span<const Key> keys) const
     -> std::future<std::vector<std::optional<Value>>> {
   std::vector<std::optional<Value>> results;
-  results.reserve(keys.size());
 
-  for (const auto &key : keys) {
-    if (auto it = key_to_byte_.find(key); it != key_to_byte_.end()) {
-      const float *start = mapped_data_ + (it->second / sizeof(float));
-      results.emplace_back(Value(start, start + *tensor_size_));
-    } else {
-      results.emplace_back(std::nullopt);
+  if (!tensor_size_.has_value()) {
+    GGB_LOG_WARN("Empty tensor dimension found");
+    results.assign(keys.size(), std::nullopt);
+  } else {
+    results.reserve(keys.size());
+    const auto *const mapped_data = static_cast<const float *>(mmap_.data());
+
+    for (const auto &key : keys) {
+      if (auto it = key_to_byte_.find(key); it != key_to_byte_.end()) {
+        const float *start = mapped_data + (it->second / sizeof(float));
+        results.emplace_back(Value(start, start + *tensor_size_));
+      } else {
+        results.emplace_back(std::nullopt);
+      }
     }
   }
 
   std::promise<std::vector<std::optional<Value>>> promise;
   promise.set_value(std::move(results));
   return promise.get_future();
-}
-
-void FlatMmapFeatureStore::setup_mmap() {
-  auto fd = open(cfg_.db_path.c_str(), O_RDONLY);
-  if (fd == -1) {
-    throw std::runtime_error("Could not open " + cfg_.db_path);
-  }
-
-  struct stat st;
-  fstat(fd, &st);
-  file_size_ = st.st_size;
-
-  mapped_data_ = static_cast<const float *>(
-      mmap(nullptr, file_size_, PROT_READ, MAP_SHARED, fd, 0));
-  close(fd);
-
-  if (mapped_data_ == MAP_FAILED) {
-    throw std::runtime_error("mmap failed");
-  }
-}
-
-void FlatMmapFeatureStore::cleanup_mmap() {
-  if (mapped_data_ != nullptr && mapped_data_ != MAP_FAILED) {
-    munmap(const_cast<float *>(mapped_data_), file_size_);
-    mapped_data_ = nullptr;
-  }
 }
 
 FlatMmapFeatureStoreBuilder::FlatMmapFeatureStoreBuilder(
@@ -93,14 +74,12 @@ FlatMmapFeatureStoreBuilder::FlatMmapFeatureStoreBuilder(
 auto FlatMmapFeatureStoreBuilder::put_tensor(const Key &key,
                                              const Value &tensor) -> bool {
   if (!out_file_) {
-    std::cerr << "Could not write to file: " << cfg_.db_path << "\n";
+    GGB_LOG_ERROR("Could not write to file: {}", cfg_.db_path);
     return false;
   }
   if (tensor_size_.has_value() && tensor.size() != tensor_size_.value()) {
-    std::cerr << "Requested `put` on tensor of size '" << tensor.size()
-              << "' but previously `put` a tensor of size '"
-              << tensor_size_.value()
-              << "'. Different tensor shapes are not yet supported\n";
+    GGB_LOG_ERROR("Mismatched tensor size: got {}, expected {}", tensor.size(),
+                  tensor_size_.value());
     return false;
   }
   tensor_size_ = tensor.size();
@@ -122,6 +101,11 @@ auto FlatMmapFeatureStoreBuilder::put_tensor(const Key &key, Value &&tensor)
     [[maybe_unused]] std::optional<GraphTopology> graph)
     -> std::unique_ptr<FeatureStore> {
   out_file_.close();
+  GGB_LOG_INFO(
+      "Building FlatMmapStore\n\tTotal Keys: {}\n\tFile Size: {:.3f} "
+      "GB\n\tPath: {}",
+      key_to_byte_.size(),
+      static_cast<double>(write_pos_) / (1024 * 1024 * 1024), cfg_.db_path);
   return std::make_unique<FlatMmapFeatureStore>(cfg_, std::move(key_to_byte_),
                                                 tensor_size_);
 }

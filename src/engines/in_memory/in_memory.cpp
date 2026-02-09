@@ -8,6 +8,8 @@
 #include <utility>
 #include <vector>
 
+#include "common/logging.h"
+
 namespace ggb::engine {
 
 InMemoryFeatureStore::InMemoryFeatureStore(
@@ -64,6 +66,11 @@ auto InMemoryFeatureStoreBuilder::put_tensor(const Key &key, Value &&tensor)
 [[nodiscard]] auto InMemoryFeatureStoreBuilder::build(
     [[maybe_unused]] std::optional<GraphTopology> graph)
     -> std::unique_ptr<FeatureStore> {
+  auto estimated_bytes = data_.size() * (sizeof(Key) + sizeof(Value));
+  GGB_LOG_INFO(
+      "Building InMemoryStore\n\tTotal Keys: {}\n\tEst. Memory: {:.3f} GB",
+      data_.size(),
+      static_cast<double>(estimated_bytes) / (1024 * 1024 * 1024));
   return std::make_unique<InMemoryFeatureStore>(std::move(data_));
 }
 

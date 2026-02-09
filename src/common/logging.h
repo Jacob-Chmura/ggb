@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <filesystem>
 #include <format>
 #include <iostream>
@@ -9,6 +10,7 @@
 namespace ggb::detail {
 
 enum class LogLevel {
+  DEBUG,
   INFO,
   WARN,
   ERROR,
@@ -16,31 +18,47 @@ enum class LogLevel {
 
 inline void log_impl(LogLevel level, std::string_view file, int line,
                      std::string_view msg) {
+  auto now = std::chrono::system_clock::now();
+  auto time_str = std::format("{:%T}", now).substr(0, 12);
+
   std::string_view prefix;
   auto show_trigger_loc = true;
+
   switch (level) {
+    case LogLevel::DEBUG:
+      prefix = "[DEBUG]";
+      break;
     case LogLevel::WARN:
-      prefix = "[WARN]";
+      prefix = "[WARN ]";
       break;
     case LogLevel::ERROR:
-      prefix = "[ERR ]";
+      prefix = "[ERR  ]";
       break;
     case LogLevel::INFO:
     default:  // Default to INFO
-      prefix = "[INFO]";
+      prefix = "[INFO ]";
       show_trigger_loc = false;
       break;
   }
 
   if (show_trigger_loc) {
     auto short_file = std::filesystem::path(file).filename().string();
-    std::cout << std::format("{} [{}:{}] {}\n", prefix, short_file, line, msg);
+    std::cout << std::format("{} {} [{}:{}] {}\n", prefix, time_str, short_file,
+                             line, msg);
   } else {
-    std::cout << std::format("{} {}\n", prefix, msg);
+    std::cout << std::format("{} {} {}\n", prefix, time_str, msg);
   }
 }
 
 }  // namespace ggb::detail
+
+#ifndef NDEBUG
+#define GGB_LOG_DEBUG(...)                                \
+  ggb::log_impl(ggb::LogLevel::DEBUG, __FILE__, __LINE__, \
+                std::format(__VA_ARGS__))
+#else
+#define GGB_LOG_DEBUG(...) ((void)0)
+#endif
 
 #define GGB_LOG_INFO(msg, ...)                                           \
   ggb::detail::log_impl(ggb::detail::LogLevel::INFO, __FILE__, __LINE__, \
