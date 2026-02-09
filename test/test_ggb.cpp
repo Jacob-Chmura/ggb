@@ -4,6 +4,7 @@
 #include <optional>
 #include <random>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -71,5 +72,27 @@ auto main() -> int {
   test_with_builder(
       ggb::create_builder(ggb::FlatMmapConfig{.db_path = db_path}));
   test_with_builder(ggb::create_builder(ggb::InMemoryConfig{}));
+
+  // Attempt `put` after `build` should fail
+  {
+    auto builder = ggb::create_builder(ggb::InMemoryConfig{});
+    builder->build();
+    try {
+      builder->put_tensor(ggb::Key{.NodeID = 0}, ggb::Value{});
+    } catch (const std::runtime_error& e) {
+      GGB_LOG_WARN("Caught expected error: {}", e.what());
+    }
+  }
+
+  // Attempt `build` after `build` should also fail
+  {
+    auto builder = ggb::create_builder(ggb::InMemoryConfig{});
+    builder->build();
+    try {
+      builder->build();
+    } catch (const std::runtime_error& e) {
+      GGB_LOG_WARN("Caught expected error: {}", e.what());
+    }
+  }
   return 0;
 }

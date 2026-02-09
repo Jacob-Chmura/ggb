@@ -55,7 +55,7 @@ FlatMmapFeatureStore::FlatMmapFeatureStore(
     for (const auto &key : keys) {
       if (auto it = key_to_byte_.find(key); it != key_to_byte_.end()) {
         const float *start = mapped_data + (it->second / sizeof(float));
-        results.emplace_back(Value(start, start + *tensor_size_));
+        results.emplace_back(Value(start, start + tensor_size_.value()));
       } else {
         results.emplace_back(std::nullopt);
       }
@@ -71,8 +71,8 @@ FlatMmapFeatureStoreBuilder::FlatMmapFeatureStoreBuilder(
     const FlatMmapConfig &cfg)
     : cfg_(cfg), out_file_(cfg.db_path, std::ios::binary) {}
 
-auto FlatMmapFeatureStoreBuilder::put_tensor(const Key &key,
-                                             const Value &tensor) -> bool {
+auto FlatMmapFeatureStoreBuilder::put_tensor_impl(const Key &key,
+                                                  const Value &tensor) -> bool {
   if (!out_file_) {
     GGB_LOG_ERROR("Could not write to file: {}", cfg_.db_path);
     return false;
@@ -92,12 +92,12 @@ auto FlatMmapFeatureStoreBuilder::put_tensor(const Key &key,
   return true;
 }
 
-auto FlatMmapFeatureStoreBuilder::put_tensor(const Key &key, Value &&tensor)
-    -> bool {
-  return put_tensor(key, static_cast<const Value &>(tensor));
+auto FlatMmapFeatureStoreBuilder::put_tensor_impl(const Key &key,
+                                                  Value &&tensor) -> bool {
+  return put_tensor_impl(key, static_cast<const Value &>(tensor));
 }
 
-[[nodiscard]] auto FlatMmapFeatureStoreBuilder::build(
+[[nodiscard]] auto FlatMmapFeatureStoreBuilder::build_impl(
     [[maybe_unused]] std::optional<GraphTopology> graph)
     -> std::unique_ptr<FeatureStore> {
   out_file_.close();

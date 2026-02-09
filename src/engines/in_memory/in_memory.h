@@ -14,7 +14,10 @@ namespace ggb::engine {
 
 class InMemoryFeatureStore final : public FeatureStore {
  public:
-  explicit InMemoryFeatureStore(std::unordered_map<Key, Value, KeyHash> &&data);
+  explicit InMemoryFeatureStore(
+      std::vector<float> &&blob,
+      std::unordered_map<Key, std::size_t, KeyHash> &&offsets,
+      std::optional<std::size_t> tensor_size);
 
   [[nodiscard]] auto name() const -> std::string_view override;
   [[nodiscard]] auto get_num_keys() const -> std::size_t override;
@@ -25,7 +28,9 @@ class InMemoryFeatureStore final : public FeatureStore {
 
  private:
   static constexpr std::string_view name_ = "InMemoryFeatureStore";
-  const std::unordered_map<Key, Value, KeyHash> data_;
+  const std::vector<float> blob_;
+  const std::unordered_map<Key, std::size_t, KeyHash> offsets_;
+  const std::optional<std::size_t> tensor_size_;
 };
 
 class InMemoryFeatureStoreBuilder final : public FeatureStoreBuilder {
@@ -33,14 +38,17 @@ class InMemoryFeatureStoreBuilder final : public FeatureStoreBuilder {
   explicit InMemoryFeatureStoreBuilder(
       [[maybe_unused]] const InMemoryConfig &cfg) {}
 
-  auto put_tensor(const Key &key, const Value &tensor) -> bool override;
-  auto put_tensor(const Key &key, Value &&tensor) -> bool override;
+  auto put_tensor_impl(const Key &key, const Value &tensor) -> bool override;
+  auto put_tensor_impl(const Key &key, Value &&tensor) -> bool override;
 
-  [[nodiscard]] auto build(std::optional<GraphTopology> graph = std::nullopt)
+  [[nodiscard]] auto build_impl(
+      std::optional<GraphTopology> graph = std::nullopt)
       -> std::unique_ptr<FeatureStore> override;
 
  private:
-  std::unordered_map<Key, Value, KeyHash> data_;
+  std::vector<float> blob_;
+  std::unordered_map<Key, std::size_t, KeyHash> offsets_;
+  std::optional<std::size_t> tensor_size_;
 };
 
 }  // namespace ggb::engine

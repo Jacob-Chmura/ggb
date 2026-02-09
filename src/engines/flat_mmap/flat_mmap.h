@@ -45,10 +45,11 @@ class FlatMmapFeatureStoreBuilder final : public FeatureStoreBuilder {
  public:
   explicit FlatMmapFeatureStoreBuilder(const FlatMmapConfig& cfg);
 
-  auto put_tensor(const Key& key, const Value& tensor) -> bool override;
-  auto put_tensor(const Key& key, Value&& tensor) -> bool override;
+  auto put_tensor_impl(const Key& key, const Value& tensor) -> bool override;
+  auto put_tensor_impl(const Key& key, Value&& tensor) -> bool override;
 
-  [[nodiscard]] auto build(std::optional<GraphTopology> graph = std::nullopt)
+  [[nodiscard]] auto build_impl(
+      std::optional<GraphTopology> graph = std::nullopt)
       -> std::unique_ptr<FeatureStore> override;
 
  private:
