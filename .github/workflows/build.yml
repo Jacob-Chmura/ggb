@@ -1,0 +1,26 @@
+---
+name: Build GGB
+
+on: # yamllint disable-line rule:truthy
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Testing across Linux and macOS
+        os: [ubuntu-latest, macos-latest]
+        build_type: [Debug, Release]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build GGB
+        shell: bash
+        run: |
+          ./scripts/ggb_build.sh ${{ matrix.build_type }}
