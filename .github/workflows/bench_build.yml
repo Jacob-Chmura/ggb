@@ -1,0 +1,37 @@
+---
+name: Build GGB Benchmarks
+
+on: # yamllint disable-line rule:truthy
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Testing across Linux and macOS
+        os: [ubuntu-latest, macos-latest]
+        build_type: [Release]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Clang Dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libc++-dev libc++abi-dev
+
+      - name: Build GGB Benchmarks
+        shell: bash
+        run: |
+          ./scripts/ggb_build.sh ${{ matrix.build_type }}
+
+      - name: Build Benchmarks Python Env
+        shell: bash
+        run: |
+          ./scripts/bench_setup_python.sh
