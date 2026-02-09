@@ -8,7 +8,7 @@
 using namespace ggb;
 
 TEST(EngineFactory, CreateInMemoryBuilder) {
-  EngineConfig cfg = InMemoryConfig{};
+  const EngineConfig cfg = InMemoryConfig{};
   auto builder = create_builder(cfg);
 
   auto* ptr = dynamic_cast<engine::InMemoryFeatureStoreBuilder*>(builder.get());
@@ -20,7 +20,7 @@ TEST(EngineFactory, CreateInMemoryBuilder) {
 }
 
 TEST(EngineFactory, CreateFlatMmapBuilder) {
-  EngineConfig cfg = FlatMmapConfig{.db_path = {"/tmp/foo.ggb"}};
+  const EngineConfig cfg = FlatMmapConfig{.db_path = {"/tmp/foo.ggb"}};
   auto builder = create_builder(cfg);
 
   auto* ptr = dynamic_cast<engine::FlatMmapFeatureStoreBuilder*>(builder.get());
