@@ -29,16 +29,19 @@ class Runner {
       : builder_(std::move(builder)), cfg_(std::move(cfg)) {}
 
   auto run() -> perf::BenchResult {
+    GGB_LOG_INFO("Starting Benchmark Runner");
     perf::BenchResult result{.cfg = cfg_, .latencies_us_{}};
 
     {
       const perf::ScopedTimer timer("Ingestion");
+      GGB_LOG_INFO("Ingesting features and graph topology");
       ingest_features();
       ingest_graph();
     }
 
     {
       const perf::ScopedTimer timer("Building");
+      GGB_LOG_INFO("Constructing FeatureStore engine");
       store_ = builder_->build(graph_);
     }
 
@@ -47,6 +50,7 @@ class Runner {
     edge_buffer_.shrink_to_fit();
 
     {
+      GGB_LOG_INFO("Running query workload");
       run_queries(result);
     }
 
@@ -63,6 +67,7 @@ class Runner {
   auto ingest_graph() -> void {
     std::ifstream file(cfg_.edge_list_path);
     if (!file.is_open()) {
+      GGB_LOG_ERROR("Failed to open file: {}", cfg_.edge_list_path.string());
       throw std::runtime_error("Failed to open edge list: " +
                                cfg_.edge_list_path.string());
     }
@@ -78,9 +83,9 @@ class Runner {
       }
 
       if (nodes.size() != 2) {
-        throw std::runtime_error(
-            "Malformed edge list: expected 2 nodes per line, got " +
-            std::to_string(nodes.size()));
+        GGB_LOG_ERROR("Malformed edge list: expected 2 nodes per line, got {}",
+                      nodes.size());
+        throw std::runtime_error("Malformed edge list");
       }
       edge_buffer_.emplace_back(nodes[0], nodes[1]);
     }

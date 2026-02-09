@@ -34,6 +34,9 @@ struct RunConfig {
   [[nodiscard]] static auto load(const std::string_view dataset_name,
                                  const std::string_view run_id)
       -> std::optional<RunConfig> {
+    GGB_LOG_INFO("Trying to load Config with dataset: {}, run_id: {}",
+                 dataset_name, run_id);
+
     const auto dataset_dir = get_dataset_dir(dataset_name);
     if (!fs::is_directory(dataset_dir)) {
       GGB_LOG_ERROR("Dataset directory not found: {}", dataset_dir.string());
@@ -80,6 +83,8 @@ struct RunConfig {
                     run_dir.string());
       return std::nullopt;
     }
+    GGB_LOG_INFO("Using query file: {}",
+                 cfg.query_csv_path.filename().string());
 
     // TODO(kuba): json parsing
     cfg.sampling = {

@@ -46,7 +46,7 @@ class MmapRegion {
       throw std::runtime_error("MmapRegion: mmap failed");
     }
 
-    GGB_LOG_DEBUG("Mapped {} ({:.2f} GB)", path,
+    GGB_LOG_DEBUG("Mapped {} ({:.4f} GB)", path,
                   static_cast<double>(size_) / (1024 * 1024 * 1024));
   }
 

@@ -12,6 +12,8 @@
 #include <utility>
 #include <vector>
 
+#include "common/logging.h"
+
 namespace ggb::engine {
 
 FlatMmapFeatureStore::FlatMmapFeatureStore(
@@ -44,6 +46,7 @@ FlatMmapFeatureStore::FlatMmapFeatureStore(
   std::vector<std::optional<Value>> results;
 
   if (!tensor_size_.has_value()) {
+    GGB_LOG_WARN("Empty tensor dimension found");
     results.assign(keys.size(), std::nullopt);
   } else {
     results.reserve(keys.size());
@@ -71,14 +74,12 @@ FlatMmapFeatureStoreBuilder::FlatMmapFeatureStoreBuilder(
 auto FlatMmapFeatureStoreBuilder::put_tensor(const Key &key,
                                              const Value &tensor) -> bool {
   if (!out_file_) {
-    std::cerr << "Could not write to file: " << cfg_.db_path << "\n";
+    GGB_LOG_ERROR("Could not write to file: {}", cfg_.db_path);
     return false;
   }
   if (tensor_size_.has_value() && tensor.size() != tensor_size_.value()) {
-    std::cerr << "Requested `put` on tensor of size '" << tensor.size()
-              << "' but previously `put` a tensor of size '"
-              << tensor_size_.value()
-              << "'. Different tensor shapes are not yet supported\n";
+    GGB_LOG_ERROR("Mismatched tensor size: got {}, expected {}", tensor.size(),
+                  tensor_size_.value());
     return false;
   }
   tensor_size_ = tensor.size();
@@ -100,6 +101,11 @@ auto FlatMmapFeatureStoreBuilder::put_tensor(const Key &key, Value &&tensor)
     [[maybe_unused]] std::optional<GraphTopology> graph)
     -> std::unique_ptr<FeatureStore> {
   out_file_.close();
+  GGB_LOG_INFO(
+      "Building FlatMmapStore\n\tTotal Keys: {}\n\tFile Size: {:.3f} "
+      "GB\n\tPath: {}",
+      key_to_byte_.size(),
+      static_cast<double>(write_pos_) / (1024 * 1024 * 1024), cfg_.db_path);
   return std::make_unique<FlatMmapFeatureStore>(cfg_, std::move(key_to_byte_),
                                                 tensor_size_);
 }

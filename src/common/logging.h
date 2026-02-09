@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <filesystem>
 #include <format>
 #include <iostream>
@@ -17,8 +18,12 @@ enum class LogLevel {
 
 inline void log_impl(LogLevel level, std::string_view file, int line,
                      std::string_view msg) {
+  auto now = std::chrono::system_clock::now();
+  auto time_str = std::format("{:%T}", now).substr(0, 12);
+
   std::string_view prefix;
   auto show_trigger_loc = true;
+
   switch (level) {
     case LogLevel::DEBUG:
       prefix = "[DEBUG]";
@@ -38,9 +43,10 @@ inline void log_impl(LogLevel level, std::string_view file, int line,
 
   if (show_trigger_loc) {
     auto short_file = std::filesystem::path(file).filename().string();
-    std::cout << std::format("{} [{}:{}] {}\n", prefix, short_file, line, msg);
+    std::cout << std::format("{} {} [{}:{}] {}\n", prefix, time_str, short_file,
+                             line, msg);
   } else {
-    std::cout << std::format("{} {}\n", prefix, msg);
+    std::cout << std::format("{} {} {}\n", prefix, time_str, msg);
   }
 }
 
