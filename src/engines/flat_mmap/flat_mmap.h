@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/mmap_region.h"
 #include "ggb/core.h"
 
 namespace ggb::engine {
@@ -21,7 +22,7 @@ class FlatMmapFeatureStore final : public FeatureStore {
       std::unordered_map<Key, std::size_t, KeyHash>&& key_to_byte,
       std::optional<std::size_t> tensor_size);
 
-  ~FlatMmapFeatureStore() override;
+  ~FlatMmapFeatureStore() override = default;
 
   [[nodiscard]] auto name() const -> std::string_view override;
   [[nodiscard]] auto get_num_keys() const -> std::size_t override;
@@ -32,15 +33,12 @@ class FlatMmapFeatureStore final : public FeatureStore {
 
  private:
   static constexpr std::string_view name_ = "FlatMmapFeatureStore";
+
   const FlatMmapConfig cfg_;
   const std::unordered_map<Key, std::size_t, KeyHash> key_to_byte_;
   const std::optional<std::size_t> tensor_size_;
 
-  const float* mapped_data_ = nullptr;
-  std::size_t file_size_{0};
-
-  void setup_mmap();
-  void cleanup_mmap();
+  detail::MmapRegion mmap_;
 };
 
 class FlatMmapFeatureStoreBuilder final : public FeatureStoreBuilder {

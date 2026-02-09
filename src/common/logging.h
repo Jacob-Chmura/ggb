@@ -9,6 +9,7 @@
 namespace ggb::detail {
 
 enum class LogLevel {
+  DEBUG,
   INFO,
   WARN,
   ERROR,
@@ -19,15 +20,18 @@ inline void log_impl(LogLevel level, std::string_view file, int line,
   std::string_view prefix;
   auto show_trigger_loc = true;
   switch (level) {
+    case LogLevel::DEBUG:
+      prefix = "[DEBUG]";
+      break;
     case LogLevel::WARN:
-      prefix = "[WARN]";
+      prefix = "[WARN ]";
       break;
     case LogLevel::ERROR:
-      prefix = "[ERR ]";
+      prefix = "[ERR  ]";
       break;
     case LogLevel::INFO:
     default:  // Default to INFO
-      prefix = "[INFO]";
+      prefix = "[INFO ]";
       show_trigger_loc = false;
       break;
   }
@@ -41,6 +45,10 @@ inline void log_impl(LogLevel level, std::string_view file, int line,
 }
 
 }  // namespace ggb::detail
+
+#define GGB_LOG_DEBUG(msg, ...)                                           \
+  ggb::detail::log_impl(ggb::detail::LogLevel::DEBUG, __FILE__, __LINE__, \
+                        std::format(msg __VA_OPT__(, ) __VA_ARGS__))
 
 #define GGB_LOG_INFO(msg, ...)                                           \
   ggb::detail::log_impl(ggb::detail::LogLevel::INFO, __FILE__, __LINE__, \

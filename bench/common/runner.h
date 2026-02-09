@@ -1,9 +1,6 @@
 #pragma once
 
-#include <fcntl.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 #include <cstdint>
 #include <cstdlib>
@@ -17,6 +14,8 @@
 #include <utility>
 #include <vector>
 
+#include "common/logging.h"
+#include "common/mmap_region.h"
 #include "config.h"
 #include "ggb/core.h"
 #include "queries.h"
@@ -89,28 +88,15 @@ class Runner {
   }
 
   auto ingest_features() -> void {
-    auto fd = open(cfg_.node_feat_path.c_str(), O_RDONLY);
-    if (fd == -1) {
-      throw std::runtime_error("Failed to open feature file");
-    }
-
-    struct stat st;
-    fstat(fd, &st);
-    const auto file_size = st.st_size;
-
-    void* mapped = mmap(nullptr, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    close(fd);
-    if (mapped == MAP_FAILED) {
-      throw std::runtime_error("mmap failed");
-    }
+    const ggb::detail::MmapRegion mmap(cfg_.node_feat_path.string());
 
     // Hint to the kernel that we will read this start-to-finish
-    madvise(mapped, file_size, MADV_SEQUENTIAL);
+    mmap.advise(MADV_SEQUENTIAL);
 
-    const char* ptr = static_cast<const char*>(mapped);
-    const char* end = ptr + file_size;
+    const char* ptr = static_cast<const char*>(mmap.data());
+    const char* const end = ptr + mmap.size();
+
     std::uint64_t node_id{0};
-
     ggb::Value tensor;
     tensor.reserve(128);  // Pre-reserve typical GNN feature dim
 
@@ -144,7 +130,8 @@ class Runner {
       }
     }
 
-    munmap(mapped, file_size);
+    GGB_LOG_INFO("Ingested {} nodes from {}", node_id,
+                 cfg_.node_feat_path.string());
   }
 
   auto run_queries(perf::BenchResult& result) -> void {
