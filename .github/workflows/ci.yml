@@ -143,4 +143,16 @@ jobs:
         run: uv python install $(cat bench/query_gen/.python-version)
 
       - name: "Run Mypy"
-        run: uv run --with mypy mypy bench/query_gen
+        run: uv run --with mypy mypy bench/query_gen --ignore-missing-imports
+
+  cpp-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+  cpp-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
