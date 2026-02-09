@@ -17,12 +17,9 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--edgelist-file", type=str, required=True, help="Path to edgelist csv file."
 )
-parser.add_argument(
-    "--rounds", type=int, default=1, help="Number of epochs to simulate."
-)
-parser.add_argument("--base-seed", type=int, default=0, help="RNG for reproducibility.")
-parser.add_argument("--batch_size", type=int, default=256, help="Batch size.")
-parser.add_argument("--num_hops", type=int, default=2, help="Number of hops to sample.")
+parser.add_argument("--seed", type=int, default=0, help="RNG for reproducibility.")
+parser.add_argument("--batch-size", type=int, default=256, help="Batch size.")
+parser.add_argument("--num-hops", type=int, default=2, help="Number of hops to sample.")
 parser.add_argument(
     "--fan-out", type=int, default=10, help="Number of neighbors to sample at each hop."
 )
@@ -31,19 +28,17 @@ parser.add_argument(
 def main() -> None:
     args = parser.parse_args()
 
-    output_root = pathlib.Path(args.edgelist_file).parent / "queries"
+    output_root = pathlib.Path(args.edgelist_file).parent
     run_dir = create_run_dir(output_root=output_root, metadata=vars(args))
 
-    for i in range(args.rounds):
-        seed = args.base_seed + i
-        generate_queries(
-            edgelist_file_str=args.edgelist_file,
-            seed=seed,
-            batch_size=args.batch_size,
-            num_hops=args.num_hops,
-            fan_out=args.fan_out,
-            output_dir=run_dir,
-        )
+    generate_queries(
+        edgelist_file_str=args.edgelist_file,
+        seed=args.seed,
+        batch_size=args.batch_size,
+        num_hops=args.num_hops,
+        fan_out=args.fan_out,
+        output_dir=run_dir,
+    )
 
 
 def generate_queries(
@@ -65,7 +60,7 @@ def generate_queries(
         shuffle=True,
     )
 
-    output_file = output_dir / f"queries-{seed}.csv"
+    output_file = output_dir / "queries.csv"
     print(f"Saving queries to '{output_file}'")
     with open(output_file, "w", newline="") as f:
         writer = csv.writer(f)
