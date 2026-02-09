@@ -5,25 +5,21 @@
 // Third-party
 #include <gtest/gtest.h>
 
-using namespace ggb;
-
 TEST(EngineFactory, CreateInMemoryBuilder) {
-  const EngineConfig cfg = InMemoryConfig{};
+  const auto cfg = ggb::InMemoryConfig{};
   auto builder = create_builder(cfg);
-
-  auto* ptr = dynamic_cast<engine::InMemoryFeatureStoreBuilder*>(builder.get());
+  auto* ptr =
+      dynamic_cast<ggb::engine::InMemoryFeatureStoreBuilder*>(builder.get());
   EXPECT_NE(ptr, nullptr)
       << "Factory failed to return InMemoryFeatureStoreBuilder for "
          "InMemoryConfig";
-
-  EXPECT_EQ(1, 1);
 }
 
 TEST(EngineFactory, CreateFlatMmapBuilder) {
-  const EngineConfig cfg = FlatMmapConfig{.db_path = {"/tmp/foo.ggb"}};
+  const auto cfg = ggb::FlatMmapConfig{.db_path = {"/tmp/foo.ggb"}};
   auto builder = create_builder(cfg);
-
-  auto* ptr = dynamic_cast<engine::FlatMmapFeatureStoreBuilder*>(builder.get());
+  auto* ptr =
+      dynamic_cast<ggb::engine::FlatMmapFeatureStoreBuilder*>(builder.get());
   EXPECT_NE(ptr, nullptr) << "Factory failed to return "
                              "FlatMmapFeatureStoreBuilder for FlatMmapConfig";
 }

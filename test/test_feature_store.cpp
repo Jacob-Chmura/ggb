@@ -11,7 +11,7 @@
 namespace {
 
 template <typename TBuilder, typename TConfig>
-auto test_builder(TConfig cfg) -> void {
+auto test_builder(const TConfig& cfg) -> void {
   TBuilder builder(cfg);
 
   EXPECT_TRUE(builder.put_tensor({0}, {1.0, 2.0}));
@@ -30,7 +30,7 @@ auto test_builder(TConfig cfg) -> void {
 }
 
 template <typename TBuilder, typename TConfig>
-void test_store(TConfig cfg) {
+void test_store(const TConfig& cfg) {
   TBuilder builder(cfg);
   const std::vector<float> feat0 = {1.0, 2.0};
   const std::vector<float> feat1 = {3.0, 4.0};
