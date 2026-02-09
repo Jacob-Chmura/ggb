@@ -53,9 +53,9 @@ inline void log_impl(LogLevel level, std::string_view file, int line,
 }  // namespace ggb::detail
 
 #ifndef NDEBUG
-#define GGB_LOG_DEBUG(...)                                \
-  ggb::log_impl(ggb::LogLevel::DEBUG, __FILE__, __LINE__, \
-                std::format(__VA_ARGS__))
+#define GGB_LOG_DEBUG(...)                                                \
+  ggb::detail::log_impl(ggb::detail::LogLevel::DEBUG, __FILE__, __LINE__, \
+                        std::format(__VA_ARGS__))
 #else
 #define GGB_LOG_DEBUG(...) ((void)0)
 #endif

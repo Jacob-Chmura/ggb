@@ -85,7 +85,12 @@ repos:
       - id: cpplint
         name: Lint C++ code
         args:
-          - "--filter=-whitespace,-legal/copyright,-build/include_subdir,-build/header_guard,-build/c++17"
+          - "--filter=-whitespace,\
+            -legal/copyright,\
+            -build/include_subdir,\
+            -build/header_guard,\
+            -build/c++17,\
+            -build/include_order"
 
   - repo: local
     hooks:

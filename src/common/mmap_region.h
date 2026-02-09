@@ -34,18 +34,16 @@ class MmapRegion {
     size_ = st.st_size;
     if (size_ == 0) {
       close(fd);
-      GGB_LOG_ERROR("Attempted to mmap an empty file: {}", path_);
-      throw std::runtime_error("MmapRegion: empty file");
+      GGB_LOG_WARN("Mmapping an empty file: {}", path_);
+      return;
     }
 
     data_ = mmap(nullptr, size_, PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);
-
     if (!mmap_data_ptr_is_valid(data_)) {
       GGB_LOG_ERROR("MMap failed for {}, errno: {}", path_, errno);
       throw std::runtime_error("MmapRegion: mmap failed");
     }
-
     GGB_LOG_DEBUG("Mapped {} ({:.4f} GB)", path,
                   static_cast<double>(size_) / (1024 * 1024 * 1024));
   }
