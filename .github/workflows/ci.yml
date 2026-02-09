@@ -142,8 +142,5 @@ jobs:
       - name: Set up Python
         run: uv python install $(cat bench/query_gen/.python-version)
 
-      - name: Install mypy
-        run: uv pip install mypy
-
       - name: "Run Mypy"
-        run: uv run mypy
+        run: uv run --with mypy mypy bench/query_gen
