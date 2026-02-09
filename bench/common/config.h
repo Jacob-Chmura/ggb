@@ -3,13 +3,11 @@
 #define PROJECT_ROOT "."  // Fallback
 #endif
 
-#include <algorithm>
 #include <cstddef>
 #include <filesystem>
 #include <iostream>
 #include <optional>
 #include <string>
-#include <vector>
 
 #include "common/logging.h"
 
@@ -30,9 +28,8 @@ struct RunConfig {
 
   fs::path node_feat_path;
   fs::path edge_list_path;
+  fs::path query_csv_path;
   SamplingParams sampling;
-
-  std::vector<fs::path> query_csvs;
 
   [[nodiscard]] static auto load(const std::string_view dataset_name,
                                  const std::string_view run_id)
@@ -58,7 +55,7 @@ struct RunConfig {
       return std::nullopt;
     }
 
-    const auto run_dir = dataset_dir / "queries" / run_id;
+    const auto run_dir = dataset_dir / run_id;
     if (!fs::is_directory(run_dir)) {
       std::cerr << "Error: Run directory does not exist: " << run_dir << "\n";
       GGB_LOG_ERROR("Run directory: {} is not a valid directory",
@@ -68,15 +65,21 @@ struct RunConfig {
 
     for (const auto& entry : fs::directory_iterator(run_dir)) {
       if (entry.path().extension() == ".csv") {
-        cfg.query_csvs.push_back(entry.path());
+        if (!cfg.query_csv_path.empty()) {
+          GGB_LOG_WARN("Multiple CSVs found in {}. Skipping: {} (using: {})",
+                       run_dir.string(), entry.path().string(),
+                       cfg.query_csv_path.string());
+          continue;
+        }
+        cfg.query_csv_path = entry.path();
       }
     }
-    if (cfg.query_csvs.empty()) {
+
+    if (cfg.query_csv_path.empty()) {
       GGB_LOG_ERROR("No query CSVs found in run directory: {}",
                     run_dir.string());
       return std::nullopt;
     }
-    std::ranges::sort(cfg.query_csvs);  // Sort so queries run in seeded order
 
     // TODO(kuba): json parsing
     cfg.sampling = {
