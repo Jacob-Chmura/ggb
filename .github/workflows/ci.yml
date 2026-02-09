@@ -126,4 +126,4 @@ jobs:
         uses: astral-sh/ruff-action@v3
         with:
           args: "format --check"
-          version-file: "pyproject.toml"
+          version-file: "bench/query_gen/pyproject.toml"
