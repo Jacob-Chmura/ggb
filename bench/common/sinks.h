@@ -4,9 +4,12 @@
 #endif
 
 #include <chrono>
+#include <filesystem>
 #include <format>
+#include <iomanip>
 #include <sstream>
 #include <string>
+#include <variant>
 
 #include "common/config.h"
 #include "common/logging.h"
@@ -51,8 +54,8 @@ class LogSink : public ResultSink {
         // Counters
         << std::format(" {:<20} : {:>12} reqs\n", "Total Queries",
                        stats.total_queries)
-        << std::format(" {:<20} : {:>12} MM\n", "Total Tensors",
-                       stats.total_tensors)
+        << std::format(" {:<20} : {:>12.2f} MM\n", "Total Tensors",
+                       static_cast<double>(stats.total_tensors) / 1e6)
         << std::string(60, '-')
         << "\n"
         // Throughput
@@ -60,8 +63,28 @@ class LogSink : public ResultSink {
                        stats.qps)
         << std::format(" {:<20} : {:>12.3f} MM/s\n", "Throughput TPS",
                        stats.tps_m)
-        << std::format(" {:<20} : {:>12.2f} GiB/s\n", "Throughput BW",
+        << std::format(" {:<20} : {:>12.2f} GB/s\n", "Throughput BW",
                        stats.gi_bps)
+        << std::string(60, '-')
+        << "\n"
+        // System IO
+        << std::format(" {:<20} : {:>12.3f} GB\n", "Peak RAM",
+                       stats.peak_ram_gb)
+        << std::format(" {:<20} : {:>12.3f} GB\n", "Disk Read",
+                       stats.disk_read_gb)
+        << std::format(" {:<20} : {:>12.2f} GB/s\n", "Disk IOPS",
+                       stats.disk_iops_gb)
+        << std::format(" {:<20} : {:>12} hits\n", "Major Faults",
+                       stats.major_faults)
+        << std::format(" {:<20} : {:>12} hits\n", "Minor Faults",
+                       stats.minor_faults)
+        << std::string(60, '-')
+        << "\n"
+        // Scheduler context switches (indicate IO blocking)
+        << std::format(" {:<20} : {:>12} \n", "CS (Voluntary)",
+                       stats.vol_context_switches)
+        << std::format(" {:<20} : {:>12} \n", "CS (Involuntary)",
+                       stats.invol_context_switches)
         << std::string(60, '-')
         << "\n"
         // Latency
