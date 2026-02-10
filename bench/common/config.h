@@ -13,6 +13,7 @@
 #include <string_view>
 
 #include "common/logging.h"
+#include "ggb/core.h"
 
 // Third-party
 #include <nlohmann/json.hpp>
@@ -20,7 +21,6 @@
 namespace ggb::bench {
 namespace fs = std::filesystem;
 
-// TODO(kuba): the engines themselves have configs
 struct RunConfig {
   using json = nlohmann::json;
 
@@ -37,15 +37,18 @@ struct RunConfig {
   fs::path node_feat_path;
   fs::path edge_list_path;
   fs::path query_csv_path;
+
+  EngineConfig engine;
   SamplingParams sampling;
 
   [[nodiscard]] static auto load(const std::string_view dataset_name,
                                  const std::string_view run_id)
       -> std::optional<RunConfig> {
-    GGB_LOG_INFO("Trying to load Config with dataset: {}, run_id: {}",
-                 dataset_name, run_id);
+    GGB_LOG_INFO("Loading config with dataset: {}, run_id: {}", dataset_name,
+                 run_id);
 
     const auto dataset_dir = get_dataset_dir(dataset_name);
+
     if (!fs::is_directory(dataset_dir)) {
       GGB_LOG_ERROR("Dataset directory not found: {}", dataset_dir.string());
       return std::nullopt;
@@ -124,15 +127,35 @@ struct RunConfig {
     return cfg;
   }
 
- private:
-  [[nodiscard]] static auto get_dataset_dir(const std::string_view dataset_name)
+  [[nodiscard]] static auto get_dataset_dir(std::string_view dataset_name)
       -> fs::path {
     return std::filesystem::path(PROJECT_ROOT) / "bench" / "data" /
            dataset_name;
   }
 
+  [[nodiscard]] auto get_dataset_dir() const -> fs::path {
+    return std::filesystem::path(PROJECT_ROOT) / "bench" / "data" /
+           dataset_name;
+  }
+
+  [[nodiscard]] auto get_run_dir() const -> fs::path {
+    return get_dataset_dir() / run_id;
+  }
+
+  [[nodiscard]] auto get_results_dir() const -> fs::path {
+    return get_run_dir() / "results";
+  }
+
+ private:
   constexpr static std::string node_feat_file_name = "node-feat.csv";
   constexpr static std::string edge_list_file_name = "edge.csv";
 };
+
+inline auto to_json(nlohmann::json& j, const RunConfig::SamplingParams& p)
+    -> void {
+  j = nlohmann::json{{"batch_size", p.batch_size},
+                     {"num_hops", p.num_hops},
+                     {"fan_out", p.fan_out}};
+}
 
 }  // namespace ggb::bench

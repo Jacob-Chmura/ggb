@@ -11,7 +11,7 @@
 
 #include "common/logging.h"
 
-namespace ggb::bench::perf {
+namespace ggb::bench {
 
 class ScopedTimer {
  public:
@@ -49,4 +49,4 @@ class ScopedTimer {
   Callback cb_;
   std::chrono::time_point<std::chrono::high_resolution_clock> start_;
 };
-}  // namespace ggb::bench::perf
+}  // namespace ggb::bench

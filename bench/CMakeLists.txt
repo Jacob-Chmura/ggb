@@ -27,3 +27,11 @@ target_include_directories(bench_main PRIVATE
 )
 
 add_definitions(-DBENCHMARKS_ROOT="${CMAKE_SOURCE_DIR}")
+
+execute_process(
+  COMMAND git rev-parse --short HEAD
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE GIT_HASH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+add_definitions(-DGGB_GIT_HASH="${GIT_HASH}")

@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR/.."
 BUILD_DIR="$PROJECT_ROOT/build"
 
-BUILD_TYPE="RelWithDebInfo"
+BUILD_TYPE="Debug"
 BUILD_BENCHMARKS="OFF"
 
 print_usage() {
@@ -13,7 +13,7 @@ print_usage() {
     echo
     echo "Arguments:"
     echo "  BUILD_TYPE    Debug | Release | RelWithDebInfo | MinSizeRel"
-    echo "                Default: RelWithDebInfo"
+    echo "                Default: Debug"
     echo
     echo "Options:"
     echo "  --bench       Build benchmarks"
