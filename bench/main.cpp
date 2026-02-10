@@ -15,7 +15,7 @@ struct Args {
 namespace {
 
 auto print_usage() -> void {
-  std::cout << "Usage: ggb-bench <dataset> <run_id> [options]\n"
+  std::cout << "Usage: bench_main <dataset> <run_id> [options]\n"
             << "Options:\n"
             << "  --engine <mmap|in_memory|all>  (default: all)\n"
             << "  --help                         Show this message\n";
@@ -39,7 +39,6 @@ auto parse_args(int argc, char** argv) -> std::optional<Args> {
       return std::nullopt;
     }
   }
-
   return args;
 }
 
