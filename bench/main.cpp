@@ -4,6 +4,7 @@
 #include "ggb/core.h"
 #include "runner.h"
 
+// TODO(kuba): Pass args via cli
 constexpr std::string dataset_name = "ogbn-arxiv";
 constexpr std::string run_id = "run-0001";
 

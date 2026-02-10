@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -27,7 +28,7 @@ using NodeID = std::uint64_t;
 using Value = std::vector<float>;
 
 struct Key {
-  // For now, we only support homogenous node keys
+  // TODO(kuba) For now, we only support homogenous node keys
   std::uint64_t NodeID;
 
   auto operator<=>(const Key &) const = default;
@@ -43,6 +44,7 @@ struct KeyHash {
   }
 };
 
+// TODO(kuba): for now, we just have edge list
 struct GraphTopology {
   std::span<const std::pair<NodeID, NodeID>> edges;
 };

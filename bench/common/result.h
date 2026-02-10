@@ -8,6 +8,7 @@
 #include <functional>
 #include <numeric>
 #include <sstream>
+#include <string>
 #include <vector>
 
 #include "common/logging.h"
@@ -26,6 +27,7 @@ struct BenchResult {
   RunConfig cfg;
   std::vector<std::uint64_t> latencies_us_;
   std::size_t num_tensors_read_{0};
+  std::size_t num_elements_per_tensor{0};
 
   auto print() -> void {
     GGB_LOG_INFO(
@@ -42,9 +44,9 @@ struct BenchResult {
     std::ranges::sort(latencies_us_);
 
     const auto n = latencies_us_.size();
-    const double sum =
+    const double total_latency =
         std::accumulate(latencies_us_.begin(), latencies_us_.end(), 0.0);
-    const double mean = sum / n;
+    const double mean = total_latency / n;
 
     auto sq_diff_sum = std::transform_reduce(
         latencies_us_.begin(), latencies_us_.end(), 0.0, std::plus<>(),
@@ -52,28 +54,45 @@ struct BenchResult {
     const double std_dev = std::sqrt(sq_diff_sum / n);
 
     auto get_p_ms = [&](double percentile) {
-      size_t idx = static_cast<size_t>(std::ceil(percentile / 100.0 * n)) - 1;
-      auto val_us = latencies_us_[std::clamp(idx, std::size_t(0), n - 1)];
+      const size_t idx =
+          static_cast<size_t>(std::ceil(percentile / 100.0 * n)) - 1;
+      auto val_us = latencies_us_[std::clamp(idx, std::size_t{0}, n - 1)];
       return val_us / 1000.0;  // Convert to ms
     };
 
+    const auto total_latency_s = total_latency / 1'000'000.0;
+    const auto qps = static_cast<double>(n) / total_latency_s;
+    const auto tps = static_cast<double>(num_tensors_read_) / total_latency_s;
+
+    const double total_tensors_m = static_cast<double>(num_tensors_read_) / 1e6;
+    const double tps_m = tps / 1e6;
+
+    const double gb_ps =
+        (static_cast<double>(num_tensors_read_ * num_elements_per_tensor *
+                             sizeof(float))) /
+        (total_latency_s * 1024 * 1024 * 1024);
+
     std::ostringstream oss;
-    oss << "\n----------------------- Benchmark ------------------------\n"
-        << std::format("{:<15} : {}\n", "Total Queries", n)
-        << std::format("{:<15} : {}\n", "Total Tensors", num_tensors_read_)
-        << std::format("{:<15} : {:.3f} ms\n", "Mean Latency", mean / 1000.0)
-        << std::format("{:<15} : {:.3f} ms\n", "Std Deviation",
+    oss << "\n"
+        << std::string(60, '=') << "\n"
+        << std::format(" {:^58} \n", "BENCHMARK: " + cfg.dataset_name)
+        << std::string(60, '=') << "\n"
+        << std::format(" {:<20} : {:>10}\n", "Total Queries", n)
+        << std::format(" {:<20} : {:>10.3f} MM\n", "Total Tensors",
+                       total_tensors_m)
+        << std::string(60, '-') << "\n"
+        << std::format(" {:<20} : {:>10.2f} req/s\n", "Queries/sec", qps)
+        << std::format(" {:<20} : {:>10.3f} MM/s\n", "Tensors/sec", tps_m)
+        << std::format(" {:<20} : {:>10.2f} GiB/s\n", "Throughput", gb_ps)
+        << std::string(60, '-') << "\n"
+        << std::format(" {:<20} : {:>10.3f} ms\n", "Latency Mean",
+                       mean / 1000.0)
+        << std::format(" {:<20} : {:>10.3f} ms\n", "Latency StdDev",
                        std_dev / 1000.0)
-        << "----------------------------------------------------------\n"
-        << std::format("{:<15} : {:.3f} ms\n", "Min",
-                       static_cast<double>(latencies_us_.front()) / 1000.0)
-        << std::format("{:<15} : {:.3f} ms\n", "P50", get_p_ms(50))
-        << std::format("{:<15} : {:.3f} ms\n", "P90", get_p_ms(90))
-        << std::format("{:<15} : {:.3f} ms\n", "P95", get_p_ms(95))
-        << std::format("{:<15} : {:.3f} ms\n", "P99", get_p_ms(99))
-        << std::format("{:<15} : {:.3f} ms\n", "Max",
-                       static_cast<double>(latencies_us_.back()) / 1000.0)
-        << "----------------------------------------------------------";
+        << std::format(" {:<20} : {:>10.3f} ms\n", "Latency P50", get_p_ms(50))
+        << std::format(" {:<20} : {:>10.3f} ms\n", "Latency P95", get_p_ms(95))
+        << std::format(" {:<20} : {:>10.3f} ms\n", "Latency P99", get_p_ms(99))
+        << std::string(60, '=');
 
     GGB_LOG_INFO("{}", oss.str());
   }

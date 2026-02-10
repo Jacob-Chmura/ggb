@@ -62,6 +62,8 @@ class Runner {
   std::vector<std::pair<ggb::NodeID, ggb::NodeID>> edge_buffer_;
 
   auto run_queries(perf::BenchResult& result) -> void {
+    result.num_elements_per_tensor = store_->get_tensor_size().value_or(0);
+
     const auto queries = QueryLoader::from_csv(cfg_.query_csv_path.string());
     for (const auto& query : queries) {
       {
