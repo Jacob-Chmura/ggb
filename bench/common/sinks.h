@@ -37,20 +37,20 @@ class LogSink : public ResultSink {
         << std::format(" {:^58} \n", "BENCHMARK: " + cfg.dataset_name)
         << std::string(60, '=')
         << "\n"
-        // Metadata Section
+        // Metadata
         << std::format(" {:<20} : {}\n", "Run ID", cfg.run_id)
         << std::format(" {:<20} : {}\n", "Engine Type", engine_info)
         << std::format(" {:<20} : {}\n", "Sampling", sampling_str)
         << std::string(60, '-')
         << "\n"
-        // Counters Section
+        // Counters
         << std::format(" {:<20} : {:>12} reqs\n", "Total Queries",
                        stats.total_queries)
         << std::format(" {:<20} : {:>12.3f} MM\n", "Total Tensors",
                        stats.total_tensors_m)
         << std::string(60, '-')
         << "\n"
-        // Throughput Section (Using >12 for numeric alignment)
+        // Throughput
         << std::format(" {:<20} : {:>12.2f} req/s\n", "Throughput QPS",
                        stats.qps)
         << std::format(" {:<20} : {:>12.3f} MM/s\n", "Throughput TPS",
@@ -59,7 +59,7 @@ class LogSink : public ResultSink {
                        stats.gi_bps)
         << std::string(60, '-')
         << "\n"
-        // Latency Section
+        // Latency
         << std::format(" {:<20} : {:>12.3f} ms\n", "Latency Mean", stats.mean)
         << std::format(" {:<20} : {:>12.3f} ms\n", "Latency StdDev",
                        stats.std_dev)
