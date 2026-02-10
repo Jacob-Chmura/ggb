@@ -48,16 +48,27 @@ class Runner {
       const ScopedTimer timer("Building");
       GGB_LOG_INFO("Constructing FeatureStore engine");
       store_ = builder_->build(graph_);
+      result.num_elements_per_tensor = store_->get_tensor_size().value_or(0);
     }
 
     // Clear edge buffer to free some RAM
     edge_buffer_.clear();
     edge_buffer_.shrink_to_fit();
 
-    {
-      GGB_LOG_INFO("Running query workload");
-      run_queries(result);
+    // Load in queries before taking an IO snapshot
+    const auto queries = QueryLoader::from_csv(cfg_.query_csv_path.string());
+
+    GGB_LOG_INFO("Running query workload");
+    result.on_start();
+
+    for (const auto& query : queries) {
+      {
+        const ScopedTimer timer(
+            [&](std::uint64_t us) { result.record_query(us, query.size()); });
+        auto feats = store_->get_multi_tensor(std::span(query));
+      }
     }
+    result.on_stop();
 
     auto stats = result.compute_stats();
     for (const auto& sink : sinks_) {
@@ -73,19 +84,6 @@ class Runner {
 
   RunConfig cfg_{};
   std::vector<std::unique_ptr<ResultSink>> sinks_;
-
-  auto run_queries(BenchResult& result) -> void {
-    result.num_elements_per_tensor = store_->get_tensor_size().value_or(0);
-
-    const auto queries = QueryLoader::from_csv(cfg_.query_csv_path.string());
-    for (const auto& query : queries) {
-      {
-        const ScopedTimer timer(
-            [&](std::uint64_t us) { result.record_query(us, query.size()); });
-        auto feats = store_->get_multi_tensor(std::span(query));
-      }
-    }
-  }
 };
 
 [[nodiscard]] inline auto create_runner(const EngineConfig& engine_type,

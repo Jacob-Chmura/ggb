@@ -18,8 +18,8 @@ print_usage() {
     echo "  --help       Show this message"
 
     echo "Environment:"
-    echo "  - Triggers a `Release --bench` build of ggb."
-    echo "  - Assumes you ran `./bench_run_query_gen.sh` with the corresponding data parameters."
+    echo "  - Triggers a 'Release --bench' build of ggb."
+    echo "  - Assumes you ran './bench_run_query_gen.sh' with the corresponding data parameters."
 }
 
 main() {
