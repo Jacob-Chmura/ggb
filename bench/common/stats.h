@@ -152,9 +152,6 @@ struct BenchResult {
              1000.0;
     };
 
-    std::uint64_t delta_faults = end_io.major_faults - start_io.major_faults;
-    std::uint64_t delta_bytes = end_io.read_bytes - start_io.read_bytes;
-
     return BenchStats{
         .mean = mean_us / 1000.0,
         .std_dev = std::sqrt(std::transform_reduce(
@@ -179,10 +176,12 @@ struct BenchResult {
             (total_s * 1024 * 1024 * 1024),
         .peak_ram_gb = end_io.peak_rss_gb,
         .disk_read_gb =
-            static_cast<double>(delta_bytes) / (1024.0 * 1024.0 * 1024.0),
-        .disk_iops_gb = static_cast<double>(delta_bytes) /
-                        (1024.0 * 1024.0 * 1024.0 * total_s),
-        .major_faults = delta_faults,
+            static_cast<double>(end_io.read_bytes - start_io.read_bytes) /
+            (1024.0 * 1024.0 * 1024.0),
+        .disk_iops_gb =
+            static_cast<double>(end_io.read_bytes - start_io.read_bytes) /
+            (1024.0 * 1024.0 * 1024.0 * total_s),
+        .major_faults = end_io.major_faults - start_io.major_faults,
         .minor_faults = end_io.minor_faults - start_io.minor_faults,
         .vol_context_switches = end_io.vol_csw - start_io.vol_csw,
         .invol_context_switches = end_io.invol_csw - start_io.invol_csw,
