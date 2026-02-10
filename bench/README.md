@@ -4,12 +4,10 @@ This directory contains the C++ benchmark harness and the Python workload genera
 
 ### Directory Structure
 
-The suite uses a structured data hierarchy to manage raw datasets, sampled workloads, and performance results.
-
 ```bash
 bench/data/
 └── <dataset_name>/                   # e.g., ogbn-arxiv
-    ├── raw_data.zip                  # Original downloaded archive
+    ├── <raw_data>.zip                  # Original downloaded archive
     ├── edge.csv                      # Extracted topology
     ├── node-feat.csv                 # Extracted features
     └── <run_id>/                     # e.g., run-0001
@@ -18,7 +16,6 @@ bench/data/
         └── results/                  # Performance telemetry
             └── result_<engine>_<time>.json
 ```
-
 
 ### Workload Generation
 
@@ -59,19 +56,7 @@ By default, this will run all the engines. You can also run a specific engine li
 ../scripts/bench_run.sh ogbn-arxiv run-0001 --engine mmap
 ```
 
-Alternatively, you can manually compile and execute:
-
-```bash
-../scripts/ggb_build.sh Release --bench # Compile
-../build/bench/bench_main # Execute
-```
-
 #### Results and Reporting
 
 After execution, metrics are logged to the console and saved as JSOn file in the corresponding `results/` directory.
 You can create your own sinks to process the benchmarking records.
-
-**Key Metrics Captures**:
-- Latency: mean, std, p50, p95, p99
-- Throughput: qps, tensors-per-second, memory bandwith
-- Provenance: git-hash, timestamp info
