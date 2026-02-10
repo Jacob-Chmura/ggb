@@ -58,6 +58,18 @@ class Runner {
     // Load in queries before taking an IO snapshot
     const auto queries = QueryLoader::from_csv(cfg_.query_csv_path.string());
 
+    const auto* const vmtouch_cmd = "vmtouch -e test.ggb";
+    GGB_LOG_INFO("Forcing Kernel Page eviction using vmtouch cmd: ",
+                 vmtouch_cmd);
+    const auto vmtouch_result = std::system(vmtouch_cmd);
+    if (vmtouch_result == 0) {
+      GGB_LOG_INFO("Succesfully evicted feature store from OS cache.");
+    } else {
+      GGB_LOG_WARN(
+          "Failed to call vmtouch cmd. Resident pages of the FeatureStore may "
+          "still be in memory");
+    }
+
     GGB_LOG_INFO("Running query workload");
     result.on_start();
 
