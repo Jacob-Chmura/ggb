@@ -23,19 +23,20 @@ class Runner {
  public:
   explicit Runner(std::unique_ptr<FeatureStoreBuilder> builder, RunConfig cfg)
       : builder_(std::move(builder)), cfg_(std::move(cfg)) {
-    sinks_.push_back(std::make_unique<perf::LogSink>());
+    add_sink(std::make_unique<LogSink>());
+    add_sink(std::make_unique<JsonSink>());
   }
 
-  auto add_sink(std::unique_ptr<perf::ResultSink> sink) -> void {
+  auto add_sink(std::unique_ptr<ResultSink> sink) -> void {
     sinks_.push_back(std::move(sink));
   }
 
   auto run() -> void {
     GGB_LOG_INFO("Starting Benchmark Runner");
-    perf::BenchResult result;
+    BenchResult result;
 
     {
-      const perf::ScopedTimer timer("Ingestion");
+      const ScopedTimer timer("Ingestion");
       GGB_LOG_INFO("Ingesting features and graph topology");
       ggb::io::ingest_features_from_csv(cfg_.node_feat_path, *builder_);
       ggb::io::ingest_edgelist_from_csv(cfg_.edge_list_path.string(),
@@ -44,7 +45,7 @@ class Runner {
     }
 
     {
-      const perf::ScopedTimer timer("Building");
+      const ScopedTimer timer("Building");
       GGB_LOG_INFO("Constructing FeatureStore engine");
       store_ = builder_->build(graph_);
     }
@@ -71,21 +72,26 @@ class Runner {
   std::vector<std::pair<ggb::NodeID, ggb::NodeID>> edge_buffer_;
 
   RunConfig cfg_{};
-  std::vector<std::unique_ptr<perf::ResultSink>> sinks_;
+  std::vector<std::unique_ptr<ResultSink>> sinks_;
 
-  auto run_queries(perf::BenchResult& result) -> void {
+  auto run_queries(BenchResult& result) -> void {
     result.num_elements_per_tensor = store_->get_tensor_size().value_or(0);
 
     const auto queries = QueryLoader::from_csv(cfg_.query_csv_path.string());
     for (const auto& query : queries) {
       {
-        const perf::ScopedTimer timer(
-            [&](std::uint64_t us) { result.latencies_us.push_back(us); });
+        const ScopedTimer timer(
+            [&](std::uint64_t us) { result.record_query(us, query.size()); });
         auto feats = store_->get_multi_tensor(std::span(query));
       }
-
-      result.num_tensors_read += query.size();
     }
   }
 };
+
+[[nodiscard]] inline auto create_runner(const EngineConfig& engine_type,
+                                        RunConfig base_cfg) -> Runner {
+  base_cfg.engine = engine_type;
+  auto builder = ggb::create_builder(engine_type);
+  return Runner(std::move(builder), std::move(base_cfg));
+}
 }  // namespace ggb::bench

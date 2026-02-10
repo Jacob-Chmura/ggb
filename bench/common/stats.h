@@ -10,7 +10,10 @@
 
 #include "common/logging.h"
 
-namespace ggb::bench::perf {
+// Third-party
+#include <nlohmann/json.hpp>
+
+namespace ggb::bench {
 
 struct BenchStats {
   // Latency (ms)
@@ -23,13 +26,30 @@ struct BenchStats {
   double gi_bps;
 
   std::size_t total_queries;
-  double total_tensors_m;
+  std::size_t total_tensors;
 };
+
+inline auto to_json(nlohmann::json& j, const BenchStats& s) -> void {
+  j = nlohmann::json{
+      {"mean_latency_ms", s.mean},        {"std_dev_latency_ms", s.std_dev},
+      {"min_latency_ms", s.min},          {"max_latency_ms", s.max},
+      {"p50_latency_ms", s.p50},          {"p95_latency_ms", s.p95},
+      {"p99_latency_ms", s.p99},          {"qps_throughput", s.qps},
+      {"tps_mm_throughput", s.tps_m},     {"tps_mm_throughput", s.tps_m},
+      {"gi_bps_throughput", s.gi_bps},    {"total_queries", s.total_queries},
+      {"total_tensors", s.total_tensors},
+  };
+}
 
 struct BenchResult {
   std::vector<std::uint64_t> latencies_us;
   std::size_t num_tensors_read{0};
   std::size_t num_elements_per_tensor{0};
+
+  auto record_query(std::uint64_t duration_us, std::size_t batch_size) -> void {
+    latencies_us.push_back(duration_us);
+    num_tensors_read += batch_size;
+  }
 
   [[nodiscard]] auto compute_stats() const -> BenchStats {
     if (latencies_us.empty()) {
@@ -77,8 +97,8 @@ struct BenchResult {
                                  sizeof(float))) /
             (total_s * 1024 * 1024 * 1024),
         .total_queries = n,
-        .total_tensors_m = static_cast<double>(num_tensors_read) / 1e6};
+        .total_tensors = num_tensors_read};
   }
 };
 
-}  // namespace ggb::bench::perf
+}  // namespace ggb::bench

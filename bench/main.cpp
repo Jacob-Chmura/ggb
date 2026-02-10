@@ -12,24 +12,13 @@ auto main() -> int {
   using ggb::bench::RunConfig;
   using ggb::bench::Runner;
 
-  auto cfg = RunConfig::load(dataset_name, run_id);
-  if (!cfg) {
+  auto base_cfg = RunConfig::load(dataset_name, run_id);
+  if (!base_cfg) {
     return 1;
   }
 
-  {
-    auto engine_cfg = ggb::InMemoryConfig{};
-    cfg->engine = engine_cfg;
-    Runner runner(ggb::create_builder(engine_cfg), cfg.value());
-    runner.run();
-  }
-
-  {
-    auto engine_cfg = ggb::FlatMmapConfig{.db_path = "test.ggb"};
-    cfg->engine = engine_cfg;
-    Runner runner(ggb::create_builder(engine_cfg), cfg.value());
-    runner.run();
-  }
+  create_runner(ggb::InMemoryConfig{}, *base_cfg).run();
+  create_runner(ggb::FlatMmapConfig{.db_path = "test.ggb"}, *base_cfg).run();
 
   return 0;
 }

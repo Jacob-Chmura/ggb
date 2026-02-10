@@ -1,5 +1,9 @@
 #pragma once
+#ifndef GGB_GIT_HASH
+#define GGB_GIT_HASH "unknown"  // Fallback
+#endif
 
+#include <chrono>
 #include <format>
 #include <sstream>
 #include <string>
@@ -9,17 +13,18 @@
 #include "common/stats.h"
 #include "ggb/core.h"
 
-namespace ggb::bench::perf {
+namespace ggb::bench {
 
 class ResultSink {
  public:
   virtual ~ResultSink() = default;
-  virtual void report(const RunConfig& cfg, const BenchStats& stats) = 0;
+  virtual auto report(const RunConfig& cfg, const BenchStats& stats)
+      -> void = 0;
 };
 
 class LogSink : public ResultSink {
  public:
-  void report(const RunConfig& cfg, const BenchStats& stats) override {
+  auto report(const RunConfig& cfg, const BenchStats& stats) -> void override {
     std::string engine_info = std::visit(
         overloaded{
             [](const FlatMmapConfig& c) {
@@ -46,8 +51,8 @@ class LogSink : public ResultSink {
         // Counters
         << std::format(" {:<20} : {:>12} reqs\n", "Total Queries",
                        stats.total_queries)
-        << std::format(" {:<20} : {:>12.3f} MM\n", "Total Tensors",
-                       stats.total_tensors_m)
+        << std::format(" {:<20} : {:>12} MM\n", "Total Tensors",
+                       stats.total_tensors)
         << std::string(60, '-')
         << "\n"
         // Throughput
@@ -77,4 +82,45 @@ class LogSink : public ResultSink {
     using Ts::operator()...;
   };
 };
-}  // namespace ggb::bench::perf
+
+class JsonSink : public ResultSink {
+ public:
+  auto report(const RunConfig& cfg, const BenchStats& stats) -> void override {
+    auto results_dir = cfg.get_results_dir();
+    std::filesystem::create_directories(results_dir);
+
+    std::string engine_name = std::visit(
+        overloaded{[](const FlatMmapConfig&) { return "mmap"; },
+                   [](const InMemoryConfig&) { return "in_memory"; }},
+        cfg.engine);
+
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time_t), "%Y-%m-%d_%H-%M-%S");
+
+    std::string filename =
+        std::format("result_{}_{}.json", engine_name, ss.str());
+    auto file_path = results_dir / filename;
+
+    nlohmann::json out;
+    out["metadata"] = {{"dataset", cfg.dataset_name},
+                       {"run_id", cfg.run_id},
+                       {"engine", engine_name},
+                       {"git_hash", GGB_GIT_HASH},
+                       {"sampling", cfg.sampling}};
+    out["stats"] = stats;
+
+    std::ofstream f(file_path);
+    f << out.dump(4);  // Indent 4 spaces
+    GGB_LOG_INFO("Results saved to: {}", file_path.string());
+  }
+
+ private:
+  template <class... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+};
+
+}  // namespace ggb::bench
