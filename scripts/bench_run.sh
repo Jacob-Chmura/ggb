@@ -19,7 +19,7 @@ print_usage() {
 
     echo "Environment:"
     echo "  - Triggers a `Release --bench` build of ggb."
-    echo "  - Assumes you ran `setup_bench_python.sh` with the corresponding data parameters."
+    echo "  - Assumes you ran `./bench_run_query_gen.sh` with the corresponding data parameters."
 }
 
 main() {
