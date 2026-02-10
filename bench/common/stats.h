@@ -44,27 +44,25 @@ struct BenchStats {
 };
 
 inline auto to_json(nlohmann::json& j, const BenchStats& s) -> void {
-  j = nlohmann::json{
-      {"mean_latency_ms", s.mean},
-      {"std_dev_latency_ms", s.std_dev},
-      {"min_latency_ms", s.min},
-      {"max_latency_ms", s.max},
-      {"p50_latency_ms", s.p50},
-      {"p95_latency_ms", s.p95},
-      {"p99_latency_ms", s.p99},
-      {"qps_throughput", s.qps},
-      {"tps_mm_throughput", s.tps_m},
-      {"gi_bps_throughput", s.gi_bps},
-      {"peak_ram_gb", s.peak_ram_gb},
-      {"disk_read_gb", s.disk_read_gb},
-      {"disk_iops_gb", s.disk_iops_gb},
-      {"major_faults", s.major_faults},
-      {"minor_faults", s.minor_faults},
-      {"voluntary_context_switches", s.vol_context_switches},
-      {"involuntary_context_switches", s.invol_context_switches},
-      {"total_queries", s.total_queries},
-      {"total_tensors", s.total_tensors},
-  };
+  j = nlohmann::json{{"mean_latency_ms", s.mean},
+                     {"std_dev_latency_ms", s.std_dev},
+                     {"min_latency_ms", s.min},
+                     {"max_latency_ms", s.max},
+                     {"p50_latency_ms", s.p50},
+                     {"p95_latency_ms", s.p95},
+                     {"p99_latency_ms", s.p99},
+                     {"qps_throughput", s.qps},
+                     {"tps_mm_throughput", s.tps_m},
+                     {"gi_bps_throughput", s.gi_bps},
+                     {"peak_ram_gb", s.peak_ram_gb},
+                     {"disk_read_gb", s.disk_read_gb},
+                     {"disk_iops_gb", s.disk_iops_gb},
+                     {"major_faults", s.major_faults},
+                     {"minor_faults", s.minor_faults},
+                     {"voluntary_context_switches", s.vol_context_switches},
+                     {"involuntary_context_switches", s.invol_context_switches},
+                     {"total_queries", s.total_queries},
+                     {"total_tensors", s.total_tensors}};
 }
 
 struct IOSnapshot {
@@ -86,24 +84,31 @@ struct IOSnapshot {
       // Linux ru_maxrss is in KiB
       snap.peak_rss_gb =
           static_cast<double>(usage.ru_maxrss) / (1024.0 * 1024.0);
+    } else {
+      GGB_LOG_WARN("getrusage failed: {}, IO metrics will be meaningless",
+                   errno);
     }
 
-    // Capture precise logical bytes from /proc
+#ifdef __linux__
     std::ifstream io_file("/proc/self/io");
+    if (!io_file.is_open()) {
+      GGB_LOG_WARN(
+          "Cannot open /proc/self/io. Are TASK_IO_ACCOUNTING configs enabled "
+          "in kernel?");
+      return snap;
+    }
+
     std::string label;
-    auto found = false;
     while (io_file >> label) {
       if (label == "read_bytes:") {
         io_file >> snap.read_bytes;
-        found = true;
-        break;
+        return snap;
       }
     }
-    if (!found) {
-      GGB_LOG_WARN(
-          "Could not find read bytes from /proc/self/io, disk_read metrics "
-          "will be meaningless");
-    }
+    GGB_LOG_WARN("'read_bytes:' key not found in /proc/self/io");
+#else
+    GGB_LOG_INFO("Non-Linux platform detected; skipping /proc/self/io stats.");
+#endif
     return snap;
   }
 };

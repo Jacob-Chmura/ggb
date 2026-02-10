@@ -34,6 +34,7 @@ class Runner {
   auto run() -> void {
     GGB_LOG_INFO("Starting Benchmark Runner");
     BenchResult result;
+    result.on_start();
 
     {
       const ScopedTimer timer("Ingestion");
@@ -59,7 +60,6 @@ class Runner {
     const auto queries = QueryLoader::from_csv(cfg_.query_csv_path.string());
 
     GGB_LOG_INFO("Running query workload");
-    result.on_start();
 
     for (const auto& query : queries) {
       {

@@ -80,7 +80,7 @@ class LogSink : public ResultSink {
                        stats.minor_faults)
         << std::string(60, '-')
         << "\n"
-        // Scheduler context switches (indicate IO blocking)
+        // Scheduler context switches
         << std::format(" {:<20} : {:>12} \n", "CS (Voluntary)",
                        stats.vol_context_switches)
         << std::format(" {:<20} : {:>12} \n", "CS (Involuntary)",
