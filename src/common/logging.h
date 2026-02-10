@@ -16,7 +16,6 @@ enum class LogLevel {
   ERROR,
 };
 
-// TODO(kuba): add a sink
 inline void log_impl(LogLevel level, std::string_view file, int line,
                      std::string_view msg) {
   auto now = std::chrono::system_clock::now();

@@ -24,9 +24,8 @@ print_usage() {
 
 check_venv() {
     if [ ! -d "$VENV_DIR" ]; then
-        echo "Python virtual environment not found in $VENV_DIR."
-        echo "Please run setup_bench_python.sh first."
-        exit 1
+        echo "Python virtual environment not found in $VENV_DIR. Running setup..."
+        "$SCRIPT_DIR/bench_setup_python.sh"
     fi
 }
 
