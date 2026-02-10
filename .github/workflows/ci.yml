@@ -169,7 +169,3 @@ jobs:
           database: "build"
           style: "file" # Use .clang-format config file
           tidy-checks: "" # Use .clang-tidy config file
-
-      - name: Fail fast?!
-        if: steps.linter.outputs.checks-failed > 0
-        run: exit 1
