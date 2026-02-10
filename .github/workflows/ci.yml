@@ -145,20 +145,18 @@ jobs:
       - name: "Run Mypy"
         run: uv run --with mypy mypy bench/query_gen --ignore-missing-imports
 
-  cpp-format:
+  cpp-lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install clang-format
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-format-18
-
-      - name: Run clang-format check
-        run: |
-          # Find all source files and check formatting
-          # --dry-run returns a non-zero exit code if formatting is needed
-          # -Werror makes it fail the job
-          find src include test -name '*.cpp' -o -name '*.h' | xargs clang-format-18 --dry-run -Werror
+      - uses: actions/checkout@v5
+      - uses: cpp-linter/cpp-linter-action@v2
+        id: linter
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          style: "file" # Use .clang-format config file
+          tidy-checks: "" # Use .clang-tidy config file
+          thread-comments: ${{ github.event_name == 'pull_request' && 'update' }}
+      - name: Fail fast?!
+        if: steps.linter.outputs.checks-failed > 0
+        run: exit 1
