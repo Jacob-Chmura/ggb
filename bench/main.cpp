@@ -18,17 +18,17 @@ auto main() -> int {
   }
 
   {
-    Runner runner(ggb::create_builder(ggb::InMemoryConfig{}), cfg.value());
-    auto results = runner.run();
-    results.print();
+    auto engine_cfg = ggb::InMemoryConfig{};
+    cfg->engine = engine_cfg;
+    Runner runner(ggb::create_builder(engine_cfg), cfg.value());
+    runner.run();
   }
 
   {
-    Runner runner(
-        ggb::create_builder(ggb::FlatMmapConfig{.db_path = "test.ggb"}),
-        cfg.value());
-    auto results = runner.run();
-    results.print();
+    auto engine_cfg = ggb::FlatMmapConfig{.db_path = "test.ggb"};
+    cfg->engine = engine_cfg;
+    Runner runner(ggb::create_builder(engine_cfg), cfg.value());
+    runner.run();
   }
 
   return 0;

@@ -14,18 +14,25 @@
 #include "config.h"
 #include "ggb/core.h"
 #include "queries.h"
-#include "result.h"
+#include "sinks.h"
+#include "stats.h"
 #include "timer.h"
 
 namespace ggb::bench {
 class Runner {
  public:
   explicit Runner(std::unique_ptr<FeatureStoreBuilder> builder, RunConfig cfg)
-      : builder_(std::move(builder)), cfg_(std::move(cfg)) {}
+      : builder_(std::move(builder)), cfg_(std::move(cfg)) {
+    sinks_.push_back(std::make_unique<perf::LogSink>());
+  }
 
-  auto run() -> perf::BenchResult {
+  auto add_sink(std::unique_ptr<perf::ResultSink> sink) -> void {
+    sinks_.push_back(std::move(sink));
+  }
+
+  auto run() -> void {
     GGB_LOG_INFO("Starting Benchmark Runner");
-    perf::BenchResult result{.cfg = cfg_, .latencies_us_{}};
+    perf::BenchResult result;
 
     {
       const perf::ScopedTimer timer("Ingestion");
@@ -51,15 +58,20 @@ class Runner {
       run_queries(result);
     }
 
-    return result;
+    auto stats = result.compute_stats();
+    for (const auto& sink : sinks_) {
+      sink->report(cfg_, stats);
+    }
   }
 
  private:
   std::unique_ptr<FeatureStoreBuilder> builder_;
   std::unique_ptr<FeatureStore> store_;
-  RunConfig cfg_{};
   std::optional<ggb::GraphTopology> graph_;
   std::vector<std::pair<ggb::NodeID, ggb::NodeID>> edge_buffer_;
+
+  RunConfig cfg_{};
+  std::vector<std::unique_ptr<perf::ResultSink>> sinks_;
 
   auto run_queries(perf::BenchResult& result) -> void {
     result.num_elements_per_tensor = store_->get_tensor_size().value_or(0);
@@ -68,11 +80,11 @@ class Runner {
     for (const auto& query : queries) {
       {
         const perf::ScopedTimer timer(
-            [&](std::uint64_t us) { result.latencies_us_.push_back(us); });
+            [&](std::uint64_t us) { result.latencies_us.push_back(us); });
         auto feats = store_->get_multi_tensor(std::span(query));
       }
 
-      result.num_tensors_read_ += query.size();
+      result.num_tensors_read += query.size();
     }
   }
 };
