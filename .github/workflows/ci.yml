@@ -149,6 +149,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libc++-dev libc++abi-dev cmake
+
+      - name: Generate Compilation Database
+        run: |
+          ./scripts/build.sh Release --bench
+
       - uses: cpp-linter/cpp-linter-action@v2
         id: linter
         env:
@@ -158,6 +168,7 @@ jobs:
           style: "file" # Use .clang-format config file
           tidy-checks: "" # Use .clang-tidy config file
           thread-comments: ${{ github.event_name == 'pull_request' && 'update' }}
+
       - name: Fail fast?!
         if: steps.linter.outputs.checks-failed > 0
         run: exit 1
